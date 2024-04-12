@@ -46,7 +46,7 @@ class DatasetConverter:
 
     def convert_to_json(self, batch=None, record_parameters=True):
         # 初始化数据结构
-
+        none_path = []
         data = {'images': []}
         for i, c in enumerate(self.csv_path):
             # 读取CSV文件
@@ -57,6 +57,11 @@ class DatasetConverter:
 
             # 根据图片名称组织数据
             for image_name, group in tqdm(df.groupby('image_name'), desc="CSV-Processing"):
+                filepath = os.path.join(self.image_folder[i], str(image_name))
+                filepath = os.path.normpath(filepath)
+                if not os.path.exists(filepath):
+                    none_path.append(filepath)
+                    continue
                 # 随机确定当前图像的拆分类型
                 if not self.split_type:
                     rand_num = random.uniform(0, 1)
@@ -77,7 +82,7 @@ class DatasetConverter:
 
                 image_info = {
                     'split': split_type,
-                    'filepath': os.path.join(self.image_folder[i], str(image_name)).replace("\\", "/"),
+                    'filepath': filepath,
                     'filename': image_name,
                     'sentences': [
                         {
@@ -109,9 +114,9 @@ class DatasetConverter:
             except Exception as e:
                 print(Fore.RED + f"Error while creating JSON file: {e}")
 
-        self.write_parameters_to_json()
+        self.write_parameters_to_json(none_path)
 
-    def write_parameters_to_json(self, json_path='parameters'):
+    def write_parameters_to_json(self, none_path,json_path='parameters'):
         json_path, _, _ = path_checker(os.path.join(self.output_path_json, self.data_name + '_' + json_path + '.json'),
                                        True, False)
         """
@@ -129,6 +134,7 @@ class DatasetConverter:
             'train_count': self.train_count,
             'val_count': self.val_count,
             'test_count': self.test_count,
+            'none_path': none_path,
         }
         try:
             with open(json_path, 'w') as json_file:
@@ -208,7 +214,7 @@ def data_coco():
     csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model = \
         check_file(csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model)
 
-    create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type)
+    # create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type)
 
     path_checker(json_path, True, False)
 

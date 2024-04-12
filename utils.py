@@ -159,13 +159,13 @@ def clip_gradient(optimizer, grad_clip):
                 param.grad.data.clamp_(-grad_clip, grad_clip)
 
 
-def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_image, min_word_freq, output_folder,
+def create_input_files(dataset, json_path, image_folder, captions_per_image, min_word_freq, output_folder,
                        max_len=48):
     """
     Creates input files for training, validation, and test data.
 
     :param dataset: name of dataset, one of 'coco', 'flickr8k', 'flickr30k'
-    :param karpathy_json_path: path of Karpathy JSON file with splits and captions
+    :param json_path: path of Karpathy JSON file with splits and captions
     :param image_folder: folder with downloaded images
     :param captions_per_image: number of captions to sample per image
     :param min_word_freq: words occuring less frequently than this threshold are binned as <unk>s
@@ -176,7 +176,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     assert dataset in {'coco', 'flickr8k', 'flickr30k'}
 
     # Read Karpathy JSON
-    with open(karpathy_json_path, 'r') as j:
+    with open(json_path, 'r') as j:
         data = json.load(j)
 
     # Read image paths and captions for each image
@@ -200,16 +200,16 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
 
         # path = os.path.join(image_folder, img['filepath'], img['filename']) \
         #     if dataset == 'coco' else os.path.join(image_folder, img['filename'])
-        path = os.path.normpath(img['filepath'])
+        img_path = os.path.normpath(img['filepath'])
 
         if img['split'] in {'train', 'restval'}:
-            train_image_paths.append(path)
+            train_image_paths.append(img_path)
             train_image_captions.append(captions)
         elif img['split'] in {'val'}:
-            val_image_paths.append(path)
+            val_image_paths.append(img_path)
             val_image_captions.append(captions)
         elif img['split'] in {'test'}:
-            test_image_paths.append(path)
+            test_image_paths.append(img_path)
             test_image_captions.append(captions)
 
     # Sanity check
@@ -239,8 +239,8 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
 
     # 为每张图像获取样本描述，并将图像保存到 HDF5 文件，描述及其长度保存到 JSON 文件
     seed(123)
-    for impaths, imcaps, split in [(train_image_paths, train_image_captions, 'TRAIN'),
-                                   (val_image_paths, val_image_captions, 'VAL'),
+    for impaths, imcaps, split in [(val_image_paths, val_image_captions, 'VAL'),
+                                   (train_image_paths, train_image_captions, 'TRAIN'),
                                    (test_image_paths, test_image_captions, 'TEST')]:
 
         with h5py.File(os.path.join(output_folder, split + '_IMAGES_' + base_filename + '.hdf5'), 'w') as h:
@@ -256,6 +256,12 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
             caplens = []
 
             for i, path in enumerate(tqdm(impaths, desc="图像处理")):
+                # 检查图像是否成功加载
+                if not os.path.exists(path):
+                    print(Fore.YELLOW + f"Error: Unable to load image at {path}")
+                    # 添加调试语句，输出图像的形状和数据类型
+                    return
+
                 # 采样描述
                 if len(imcaps[i]) < captions_per_image:
                     # 如果此图像的现有描述数量少于 captions_per_image，
@@ -271,9 +277,9 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
 
                 # 使用 cv2 读取图像
                 img = cv2.imread(impaths[i])
-
                 # 如果需要，将 BGR 转换为 RGB
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
                 # 检查图像是否为灰度图（2D），如果是，将其转换为 RGB（3D）
                 if len(img.shape) == 2:
                     img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
@@ -364,7 +370,7 @@ def create_csv(txt_path, csv_path=None):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best,temp_path):
+                    bleu4, is_best, temp_path):
     """
     Saves model checkpoint.
 
@@ -387,8 +393,8 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
     filename = 'checkpoint_' + data_name + '_epoch_' + str(epoch) + '.pth'
-    epoch_path = os.path.join(temp_path,filename)
-    best_path = os.path.join(temp_path,'BEST_'+filename)
+    epoch_path = os.path.join(temp_path, filename)
+    best_path = os.path.join(temp_path, 'BEST_' + filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
     torch.save(state, file_path)
