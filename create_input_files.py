@@ -51,7 +51,7 @@ class DatasetConverter:
         for i, c in enumerate(self.csv_path):
             # 读取CSV文件
             if batch:
-                df = pd.read_csv(c, delimiter='|', nrows=batch[i])
+                df = pd.read_csv(c, delimiter='|', nrows=batch[i]+1)
             else:
                 df = pd.read_csv(c, delimiter='|')
 
@@ -156,11 +156,11 @@ def check_file(csv_path, image_folder, output_path_json, output_path_hdf5, outpu
     return csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model
 
 
-def create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=None):
+def create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=None,data_len=None):
     # csv data to json
     converter = DatasetConverter(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type)
     # 设置数据量
-    converter.convert_to_json(None)
+    converter.convert_to_json(data_len)
 
 
 def data_flicker():
@@ -194,16 +194,17 @@ def data_coco():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'coco'
+    dataset_name = 'coco_short'
     csv_path = ['datasets/COCO2014/coco_train2014.csv',
                 'datasets/COCO2014/coco_val2014.csv']
     image_folder = ['datasets/COCO2014/train2014',
                     'datasets/COCO2014/val2014']
     split_type = ['train', 'val']
+    data_len = [10000,2000]
     per = 5
     freq = 5
     max_len = 100
-    out_path = 'out_data/coco/'
+    out_path = f'out_data/{dataset_name}/'
 
     output_path_json = '{}out_json'.format(out_path)
     output_path_hdf5 = '{}out_hdf5/per_{}_freq_{}_maxlen_{}'.format(out_path, per, freq, max_len)
@@ -214,7 +215,7 @@ def data_coco():
     csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model = \
         check_file(csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model)
 
-    # create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type)
+    create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type,data_len=data_len)
 
     path_checker(json_path, True, False)
 

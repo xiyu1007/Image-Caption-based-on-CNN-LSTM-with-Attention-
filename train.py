@@ -1,3 +1,5 @@
+import os.path
+
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
@@ -13,9 +15,9 @@ from colorama import init, Fore
 
 init()
 
-data_folder = 'out_data/coco/out_hdf5/per_5_freq_5_maxlen_100'  # folder with data files saved by create_input_files.py
-data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-temp_path = 'out_data/coco/save_model/'
+data_folder = f'out_data/coco_short/out_hdf5/per_5_freq_5_maxlen_100'  # folder with data files saved by create_input_files.py
+data_name = 'coco_short_5_cap_per_img_5_min_word_freq'  # base name shared by data files
+temp_path = 'out_data/coco_short/save_model/'
 
 # Model parameters
 emb_dim = 512  # 词嵌入的维度
@@ -54,6 +56,7 @@ def main():
 
     # Read word map
     word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
+    word_map_file =os.path.normpath(word_map_file)
 
     with open(word_map_file, 'r') as j:
         word_map = json.load(j)
