@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torchvision
-from gensim.models import KeyedVectors
+# from gensim.models import KeyedVectors
 
 from colorama import init, Fore
 

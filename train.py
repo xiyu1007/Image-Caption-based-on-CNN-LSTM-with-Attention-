@@ -15,9 +15,9 @@ from colorama import init, Fore
 
 init()
 
-data_folder = f'out_data/coco_short/out_hdf5/per_5_freq_5_maxlen_100'  # folder with data files saved by create_input_files.py
-data_name = 'coco_short_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-temp_path = 'out_data/coco_short/save_model/'
+data_folder = f'out_data/flickr8k/out_hdf5/per_5_freq_5_maxlen_52'  # folder with data files saved by create_input_files.py
+data_name = 'flickr8k_5_cap_per_img_5_min_word_freq'  # base name shared by data files
+temp_path = 'out_data/flickr8k/save_model'
 
 # Model parameters
 emb_dim = 512  # 词嵌入的维度
@@ -45,7 +45,8 @@ best_bleu4 = 0.  # 当前的最佳 BLEU-4 分数
 print_freq = 100  # 每训练多少个批次打印一次训练/验证统计信息
 fine_tune_encoder = True  # 是否对编码器进行微调
 # 检查点的路径，如果为 None，则没有检查点
-checkpoint = None
+checkpoint = "out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_1.pth"
+checkpoint,_,_ = path_checker(checkpoint,True,False)
 
 def main():
     """

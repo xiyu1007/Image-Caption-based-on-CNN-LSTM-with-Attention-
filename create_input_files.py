@@ -27,7 +27,7 @@ class DatasetConverter:
         self.split_type = split_type
         self.csv_path = csv_path
         self.image_folder = image_folder
-        if not split_type:
+        if split_type:
             assert len(split_type) == len(csv_path)
         assert len(csv_path) == len(image_folder)
 
@@ -168,22 +168,29 @@ def data_flicker():
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
     dataset_name = 'flickr8k'
+
     csv_path = ['datasets/flickr8k/new_csv/captions.csv']
+
     image_folder = ['datasets/flickr8k/images']
     split_type = None
+    data_len = None
+    per = 5
+    freq = 5
+    max_len = 52
+    out_path = f'out_data/{dataset_name}/'
 
-    output_path_json = 'out_data/flicker/out_json/new_json'
-    output_path_hdf5 = 'out_data/flicker/out_hdf5/per_5_freq_5_maxlen_100'
-    output_path_model = 'out_data/flicker/new_model'
+    output_path_json = '{}out_json'.format(out_path)
+    output_path_hdf5 = '{}out_hdf5/per_{}_freq_{}_maxlen_{}'.format(out_path, per, freq, max_len)
+    output_path_model = '{}save_model'.format(out_path)
 
-    json_path = f'out_data/flicker/out_json/new_json/flickr8k.json'
+    json_path = '{}/{}.json'.format(output_path_json, dataset_name)
 
     csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model = \
         check_file(csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model)
 
-    create_csv(f'datasets/flickr8k/captions.txt', csv_path)
+    create_csv(f'datasets/flickr8k/captions.txt', csv_path[0])
 
-    create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type)
+    create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type,data_len=data_len)
 
     path_checker(json_path, True, False)
     # captions_per_image:5  min_word_freq: 5
@@ -224,5 +231,5 @@ def data_coco():
 
 
 if __name__ == '__main__':
-    # data_flicker()
-    data_coco()
+    data_flicker()
+    # data_coco()

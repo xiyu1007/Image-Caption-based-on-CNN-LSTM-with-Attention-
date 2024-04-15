@@ -281,15 +281,15 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
 
 if __name__ == '__main__':
     # 设置参数
-    model_path = 'out_data/flicker/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_11.pth'  # 模型路径
+    model_path = 'out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_1.pth'  # 模型路径
     img_path = f'datasets/flickr8k/images/44129946_9eeb385d77.jpg'  # 图像路径
-    word_map_path = 'out_data/flicker/out_hdf5/per_5_freq_5_maxlen_52/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
+    word_map_path = 'out_data/flickr8k/out_hdf5/per_5_freq_5_maxlen_52/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
     model_path,_,_ = path_checker(model_path,True,False)
     img_path,_,_ = path_checker(img_path,True,False)
     word_map_path,_,_ = path_checker(word_map_path,True,False)
 
     beam_size = 5  # beam search 的 beam 大小
-    smooth = True  # 是否进行 alpha 叠加平滑
+    smooth = True  # 是否进行 alpha 叠加平滑r
 
     # 加载模型
     checkpoint = torch.load(model_path, map_location=str(device))
