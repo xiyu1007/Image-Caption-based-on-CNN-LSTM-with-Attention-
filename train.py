@@ -15,9 +15,9 @@ from colorama import init, Fore
 
 init()
 
-data_folder = f'out_data/flickr8k/out_hdf5/per_5_freq_5_maxlen_52'  # folder with data files saved by create_input_files.py
-data_name = 'flickr8k_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-temp_path = 'out_data/flickr8k/save_model'
+data_folder = f'out_data/coco/out_hdf5/per_5_freq_5_maxlen_100'  # folder with data files saved by create_input_files.py
+data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
+temp_path = 'out_data/coco/save_model'
 
 # Model parameters
 emb_dim = 512  # 词嵌入的维度
@@ -33,7 +33,7 @@ cudnn.benchmark = True
 start_epoch = 0  # 开始的训练轮次
 epochs = 100  # 训练的总轮次
 epochs_since_improvement = 0  # 自上次在验证集上取得改进以来的轮次数，用于提前停止
-batch_size = 32  # 32 每个训练批次中的样本数
+batch_size = 16  # 32 每个训练批次中的样本数
 workers = 0  # 数据加载的工作进程数 num_workers参数设置为0，这将使得数据加载在主进程中进行，而不使用多进程。
 # 这个错误是由于h5py对象无法被序列化（pickled）引起的。
 # 在使用多进程（multiprocessing）加载数据时，数据加载器（DataLoader）会尝试对每个批次的数据进行序列化，以便在不同的进程中传递。
@@ -43,10 +43,11 @@ grad_clip = 5.  # 梯度裁剪的阈值，用于防止梯度爆炸
 alpha_c = 1.  # '双重随机注意力'的正则化参数
 best_bleu4 = 0.  # 当前的最佳 BLEU-4 分数
 print_freq = 100  # 每训练多少个批次打印一次训练/验证统计信息
-fine_tune_encoder = True  # 是否对编码器进行微调
+fine_tune_encoder = False  # 是否对编码器进行微调
 # 检查点的路径，如果为 None，则没有检查点
-checkpoint = "out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_1.pth"
+checkpoint = "out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_2.pth"
 checkpoint,_,_ = path_checker(checkpoint,True,False)
+checkpoint = None
 
 def main():
     """
