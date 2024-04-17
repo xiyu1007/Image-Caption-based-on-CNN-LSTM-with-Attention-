@@ -194,23 +194,24 @@ def data_flicker():
 
     path_checker(json_path, True, False)
     # captions_per_image:5  min_word_freq: 5
-    create_input_files(dataset_name, json_path, image_folder, 5, 5, output_path_hdf5, max_len=100)
+    create_input_files(dataset_name, json_path, image_folder, 5, 5, output_path_hdf5, max_len=20)
 
 
 def data_coco():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'coco_short'
+    dataset_name = 'coco'
     csv_path = ['datasets/COCO2014/coco_train2014.csv',
                 'datasets/COCO2014/coco_val2014.csv']
     image_folder = ['datasets/COCO2014/train2014',
                     'datasets/COCO2014/val2014']
     split_type = ['train', 'val']
-    data_len = [10000,2000]
+    # data_len = [10000,2000]
+    data_len = None
     per = 5
     freq = 5
-    max_len = 100
+    max_len = 20
     out_path = f'out_data/{dataset_name}/'
 
     output_path_json = '{}out_json'.format(out_path)

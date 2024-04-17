@@ -1,17 +1,22 @@
 import os.path
-
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
 from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from nltk.translate.bleu_score import corpus_bleu
+from colorama import init, Fore
+
+import sys
+from PyQt5.QtWidgets import QApplication
+from Win_Qt import MainWindow
+import threading
+from queue import Queue
+
 from models import Encoder, DecoderWithAttention
 from datasets import *
 from utils import *
-from nltk.translate.bleu_score import corpus_bleu
-
-from colorama import init, Fore
+from config import Config
 
 init()
 
@@ -44,21 +49,24 @@ alpha_c = 1.  # '双重随机注意力'的正则化参数
 best_bleu4 = 0.  # 当前的最佳 BLEU-4 分数
 print_freq = 100  # 每训练多少个批次打印一次训练/验证统计信息
 fine_tune_encoder = False  # 是否对编码器进行微调
+
 # 检查点的路径，如果为 None，则没有检查点
-checkpoint = "out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_2.pth"
-checkpoint,_,_ = path_checker(checkpoint,True,False)
+checkpoint = "out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth"
+checkpoint, _, _ = path_checker(checkpoint, True, False)
 checkpoint = None
+
 
 def main():
     """
     Training and validation.
     """
+    config = Config()
 
     global best_bleu4, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, data_name, word_map
 
     # Read word map
     word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
-    word_map_file =os.path.normpath(word_map_file)
+    word_map_file = os.path.normpath(word_map_file)
 
     with open(word_map_file, 'r') as j:
         word_map = json.load(j)
@@ -143,7 +151,8 @@ def main():
               encoder_optimizer=encoder_optimizer,
               decoder_optimizer=decoder_optimizer,
               epoch=epoch,
-              word_map=word_map)
+              word_map=word_map,
+              config=config)
 
         # One epoch's validation
         recent_bleu4 = validate(val_loader=val_loader,
@@ -163,11 +172,11 @@ def main():
 
         # Save checkpoint
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best,temp_path)
+                        decoder_optimizer, recent_bleu4, is_best, temp_path)
         time.sleep(1)
 
 
-def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, word_map):
+def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer, epoch, word_map, config):
     """
     Performs one epoch's training.
     :param train_loader: DataLoader for training data
@@ -238,6 +247,28 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
             t.set_postfix(loss=f"{losses.val:.4f}({losses.avg:.4f})",
                           top5=f"{top5accs.val:.3f} ({top5accs.avg:.3f})")
             t.update(1)
+            config.check_timeout()
+            if config.save_flag:
+                save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
+                                     decoder_optimizer, 0, temp_path)
+                time.sleep(0.05)
+                continue
+
+            log_path = os.path.join(temp_path, "save_log.json")
+            save_flag = False
+            try:
+                with open(log_path, "r") as file:
+                    log_data = json.load(file)
+                    save_flag = log_data.get("save_flag", False)
+            except FileNotFoundError:
+                pass
+
+            if save_flag:
+                save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
+                                     decoder_optimizer, 0, temp_path)
+                time.sleep(0.05)
+                with open(log_path, "w") as file:
+                    json.dump({"save_flag": False}, file)
 
 
 def validate(val_loader, encoder, decoder, criterion, word_map):
@@ -249,7 +280,7 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
     :param criterion: loss layer
     :return: BLEU-4 score
     """
-    #TODO
+    # TODO
     decoder.eval()  # eval mode (no dropout or batchnorm)
     if encoder is not None:
         encoder.eval()
@@ -332,4 +363,22 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
 
 
 if __name__ == '__main__':
+    def window_thread():
+        word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
+        word_map_file = os.path.normpath(word_map_file)
+
+        app = QApplication(sys.argv)
+        filename = 'temp_checkpoint_' + data_name + '.pth'
+        model_path = os.path.join(temp_path, filename)
+        model_path, _, _ = path_checker(model_path, True, False)
+        window = MainWindow(model_path, word_map_file)
+        window.show()
+
+        app.exec_()  # 启动 Qt 主循环
+
+
+    # 创建并启动窗口线程
+    window_thread = threading.Thread(target=window_thread)
+    window_thread.start()
+
     main()

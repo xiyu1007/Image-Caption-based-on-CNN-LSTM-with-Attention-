@@ -160,7 +160,7 @@ def clip_gradient(optimizer, grad_clip):
 
 
 def create_input_files(dataset, json_path, image_folder, captions_per_image, min_word_freq, output_folder,
-                       max_len=48):
+                       max_len=25):
     """
     Creates input files for training, validation, and test data.
 
@@ -173,7 +173,7 @@ def create_input_files(dataset, json_path, image_folder, captions_per_image, min
     :param max_len: don't sample captions longer than this length
     """
 
-    assert dataset in {'coco', 'flickr8k', 'flickr30k','coco_short'}
+    assert dataset in {'coco', 'flickr8k', 'flickr30k'}
 
     # Read Karpathy JSON
     with open(json_path, 'r') as j:
@@ -406,6 +406,37 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
         print(Fore.GREEN + "Successful: save BEST model")
         time.sleep(0.01)
 
+def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
+                    bleu4, temp_path):
+    """
+    Saves model checkpoint.
+
+    :param data_name: base name of processed dataset
+    :param epoch: epoch number
+    :param epochs_since_improvement: number of epochs since last improvement in BLEU-4 score
+    :param encoder: encoder model
+    :param decoder: decoder model
+    :param encoder_optimizer: optimizer to update encoder's weights, if fine-tuning
+    :param decoder_optimizer: optimizer to update decoder's weights
+    :param bleu4: validation BLEU-4 score for this epoch
+    :param is_best: is this checkpoint the best so far?
+    """
+
+    state = {'epoch': epoch,
+             'epochs_since_improvement': epochs_since_improvement,
+             'bleu-4': bleu4,
+             'encoder': encoder,
+             'decoder': decoder,
+             'encoder_optimizer': encoder_optimizer,
+             'decoder_optimizer': decoder_optimizer}
+    filename = 'temp_checkpoint_' + data_name + '.pth'
+    epoch_path = os.path.join(temp_path, filename)
+    file_path, _, _ = \
+        path_checker(epoch_path, True, False)
+    torch.save(state, file_path)
+    print(Fore.GREEN + "Successful: save temp model")
+    time.sleep(0.01)
+
 
 def adjust_learning_rate(optimizer, shrink_factor):
     """
@@ -417,17 +448,6 @@ def adjust_learning_rate(optimizer, shrink_factor):
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr'] * shrink_factor
     print("The new learning rate is %f\n" % (optimizer.param_groups[0]['lr'],))
-
-
-def show_img(img, title):
-    title = ""
-    plt.imshow(img)
-    plt.axis('off')
-    plt.text(0.5, -0.1, title, horizontalalignment='center', verticalalignment='center',
-             transform=plt.gca().transAxes)
-    # 调整子图布局，确保图像填满绘图区域
-    # plt.tight_layout()
-    plt.show()
 
 
 if __name__ == '__main__':
