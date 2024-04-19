@@ -85,18 +85,10 @@ class Attention(nn.Module):
         # 计算注意力权重
         # ( k1 + k2 ) * Wv => V
         att = self.full_att(self.relu(att1 + att2.unsqueeze(1))).squeeze(2)  # (batch_size, num_pixels)
-        """
-        将 att1 和 att2.unsqueeze(1) 相加的操作是因为注意力机制的设计。
-        通常在注意力机制中，我们希望结合两个来源的信息来计算注意力权重。
-        att1 是来自编码器输出的注意力信息，
-        att2.unsqueeze(1) 是来自解码器输出的注意力信息。
-        通过将它们相加，我们允许模型在计算注意力权重时同时考虑这两个信息源的贡献。
-        这种相加的操作在注意力机制中是一种常见的方法，它允许模型灵活地结合不同来源的信息来计算最终的注意力权重。
-        """
+
         # 使用 softmax 计算权重值
         alpha = self.softmax(att)  # (batch_size, num_pixels)
         # 计算注意力加权编码
-        # q * v => a
         attention_weighted_encoding = (encoder_out * alpha.unsqueeze(2)).sum(dim=1)  # (batch_size, encoder_dim)
 
         return attention_weighted_encoding, alpha

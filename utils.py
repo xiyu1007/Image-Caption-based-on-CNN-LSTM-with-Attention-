@@ -17,6 +17,29 @@ init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+# 将时间字符串转换为秒
+def time_to_seconds(train_time):
+    hours, minutes, seconds = map(float, train_time.split(':'))
+    return hours * 3600 + minutes * 60 + seconds
+
+
+# 将秒转换为时间字符串
+def seconds_to_time(seconds):
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
+def record_trian_time(train_time, elapsed_time_seconds):
+    # 将时间字符串转换为秒，并相加
+    total_seconds = time_to_seconds(train_time) + elapsed_time_seconds
+    # 将相加后的秒数转换为时间字符串
+    total_time = seconds_to_time(total_seconds)
+    return total_time
+
+
 def caps_to_hot(batch_size, targets, max_length, word_map=None):
     if not word_map:
         global Word_map
@@ -370,7 +393,7 @@ def create_csv(txt_path, csv_path=None):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, temp_path):
+                    bleu4, is_best, temp_path, train_time):
     """
     Saves model checkpoint.
 
@@ -387,6 +410,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
 
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
+             'train_time': train_time,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
@@ -406,8 +430,10 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
         print(Fore.GREEN + "Successful: save BEST model")
         time.sleep(0.01)
 
-def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, temp_path):
+
+def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
+                         decoder_optimizer,
+                         bleu4, temp_path, train_time,i):
     """
     Saves model checkpoint.
 
@@ -424,17 +450,21 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
 
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
+             'train_time': train_time,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
-    filename = 'temp_checkpoint_' + data_name + '.pth'
+    filename = 'temp_checkpoint_' + data_name + f'_{str(i)}' + '.pth'
     epoch_path = os.path.join(temp_path, filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
-    torch.save(state, file_path)
-    print(Fore.GREEN + "Successful: save temp model")
+    with open(file_path, 'wb') as f:
+        torch.save(state, f)
+        # f.flush()  # 强制将缓冲区中的数据写入磁盘
+        # f.close()
+    print(Fore.GREEN + "\nSuccessful: save temp model")
     time.sleep(0.01)
 
 

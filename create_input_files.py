@@ -232,5 +232,5 @@ def data_coco():
 
 
 if __name__ == '__main__':
-    data_flicker()
-    # data_coco()
+    # data_flicker()
+    data_coco()

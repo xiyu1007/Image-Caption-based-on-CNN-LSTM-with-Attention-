@@ -2,10 +2,9 @@ import os
 from pycocotools.coco import COCO
 import csv
 import matplotlib.pyplot as plt
-from utils import draw
 
 
-def coco_to_csv(annFile,csv_path):
+def coco_to_csv(annFile, csv_path):
     coco = COCO(annFile)
     # 打开CSV文件以写入模式
     with open(csv_path, 'w', newline='') as csvfile:
@@ -31,26 +30,15 @@ def coco_to_csv(annFile,csv_path):
             for idx, ann in enumerate(anns):
                 writer.writerow([img['file_name'], idx, ann['caption']])
 
-def show():
-    # 指定要显示的图片ID
-    img_name = "COCO_val2014_000000184613.jpg"  # 这里替换为你想要显示的图片ID
-    image_dir = "datasets/COCO2014/val2014"
-    csv_path = 'datasets/COCO2014/coco_val2014.csv'
-    # 调用函数显示指定图片及其标题
-    draw(img_name, image_dir, csv_path)
-
 
 if __name__ == '__main__':
-    # show()
     dataDir = 'datasets/COCO2014/annotations_trainval2014'
     dataType = 'val2014'  # or 'train2014' for training set
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
     csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
-    coco_to_csv(annFile,csv_path)
+    coco_to_csv(annFile, csv_path)
 
     dataType = 'train2014'  # or 'train2014' for training set
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
     csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
-    coco_to_csv(annFile,csv_path)
-
-
+    coco_to_csv(annFile, csv_path)

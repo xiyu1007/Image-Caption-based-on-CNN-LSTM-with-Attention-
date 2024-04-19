@@ -1,25 +1,28 @@
-import io
-import matplotlib
-import skimage
+import time
+
+import torch
 import torch.nn.functional as F
+import numpy as np
+import json
 import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
+import skimage
 # import argparse
+import cv2
 from PIL import Image
-from PyQt5.QtGui import QImage
+import matplotlib
+
 from utils import *
 
-matplotlib.use('Agg')  # 多线程错误问题
-
-from matplotlib import pyplot as plt
+matplotlib.use('TkAgg')
 
 from colorama import init, Fore
-
 init()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=5, max_len=20):
+def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=5):
     """
     读取图像并使用 beam search 进行字幕生成。
     :param encoder: 编码器模型
@@ -72,6 +75,13 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
 
     # 张量以存储每一步的前 k 个前一个单词；现在它们只是 <start>
     k_prev_words = torch.LongTensor([[word_map['<start>']]] * k).to(device)  # (k, 1)
+    """
+    tensor([[504],
+        [504],
+        [504],
+        [504],
+        [504]], device='cuda:0')
+    """
 
     # 张量以存储前 k 个序列；现在它们只是 <start>
     seqs = k_prev_words  # (k, 1)
@@ -96,6 +106,13 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
 
     score_list = [[]]
     while True:
+        # k_prev_words：
+        # tensor([[0.],
+        #         [0.],
+        #         [0.],
+        #         [0.],
+        #         [0.]], device='cuda:0')
+
         """
         nn.Embedding 层并不会自动将输入张量转换成 (batch_size, max_caption_length) 这样的维度。
         它仅仅是根据输入张量中的整数索引，从嵌入矩阵中选取对应的嵌入向量。
@@ -153,7 +170,11 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
             top_k_scores, top_k_words = scores[0].topk(k, 0, True, True)  # (s)
 
         else:
+            # Unroll and find top scores, and their unrolled indices
+
             top_k_scores, top_k_words = scores.view(-1).topk(k, 0, True, True)  # (s)
+
+        # Convert unrolled indices to actual indices of scores
 
         prev_word_inds = top_k_words // vocab_size  # (s)
         # next_word_inds = top_k_words % vocab_size  # (s)
@@ -161,11 +182,24 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
         # prev_word_inds = torch.div(top_k_words, vocab_size, rounding_mode='floor')  # (s)
         next_word_inds = top_k_words % vocab_size  # (s)
 
+        # print(Fore.BLUE + str(prev_word_inds.shape))
+        # print(Fore.YELLOW + str(next_word_inds.shape))
+        # print(Fore.BLUE + str(prev_word_inds))
+        # print(Fore.YELLOW + str(next_word_inds))
+        # print(Fore.BLUE + str(seqs[prev_word_inds].shape))
+        # print(Fore.YELLOW + str(seqs[prev_word_inds]))
+        # print(Fore.BLUE + str(next_word_inds.unsqueeze(1).shape))
+        # print(Fore.YELLOW + str(next_word_inds.unsqueeze(1)))
+
+        # Add new words to sequences, alphas
+
         seqs = torch.cat([seqs[prev_word_inds], next_word_inds.unsqueeze(1)], dim=1)  # (s, step+1)
-        seqs_alpha = torch.cat([seqs_alpha[prev_word_inds], alpha[prev_word_inds].unsqueeze(1)], dim=1)
+        seqs_alpha = torch.cat([seqs_alpha[prev_word_inds], alpha[prev_word_inds].unsqueeze(1)],
+                               dim=1)  # (s, step+1, enc_image_size, enc_image_size)
 
         # Which sequences are incomplete (didn't reach <end>)?
-        incomplete_inds = [ind for ind, next_word in enumerate(next_word_inds) if next_word != word_map['<end>']]
+        incomplete_inds = [ind for ind, next_word in enumerate(next_word_inds) if
+                           next_word != word_map['<end>']]
         complete_inds = list(set(range(len(next_word_inds))) - set(incomplete_inds))
 
         # Set aside complete sequences
@@ -173,10 +207,6 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
             complete_seqs.extend(seqs[complete_inds].tolist())
             complete_seqs_alpha.extend(seqs_alpha[complete_inds].tolist())
             complete_seqs_scores.extend(top_k_scores[complete_inds])
-        elif step > max_len:
-            complete_seqs.extend(seqs.tolist())
-            complete_seqs_alpha.extend(seqs_alpha.tolist())
-            complete_seqs_scores.extend(top_k_scores)
         k -= len(complete_inds)  # reduce beam length accordingly
 
         # Proceed with incomplete sequences
@@ -191,7 +221,7 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
         k_prev_words = next_word_inds[incomplete_inds].unsqueeze(1)
 
         # Break if things have been going on too long
-        if step > max_len:
+        if step > 50:
             break
         step += 1
     print(Fore.BLUE + str(complete_seqs_scores))
@@ -222,11 +252,9 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
 
     words = [rev_word_map[ind] for ind in seq]
 
-    print(Fore.GREEN + "Caption=> ", end="")
+    print(Fore.GREEN + "Caption=> ",end="")
     for w in words:
-        print(Fore.GREEN + str(w), end=" ")
-
-    plt.figure()
+        print(Fore.GREEN + str(w),end=" ")
 
     for t in range(len(words)):
         if t > 50:
@@ -248,80 +276,26 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
             plt.imshow(alpha, alpha=0.8)
         plt.set_cmap('Greys_r')
         plt.axis('off')
-
-    # Create a buffer to hold the image data
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-
     plt.show()
-    # plt.close()
-
-    # Convert buffer to QImage
-    img = Image.open(buf)
-    qimage = QImage(img.tobytes(), img.width, img.height, img.width * 4, QImage.Format_RGBA8888)
-
-    return qimage
-
-
-def qt_show(model_path, img_path, word_map_path):
-    # 设置参数
-    beam_size = 5  # beam search 的 beam 大小
-    smooth = True  # 是否进行 alpha 叠加平滑
-    # 加载模型
-    # 加载模型
-    try:
-        checkpoint = torch.load(model_path, map_location=str(device))
-        decoder = checkpoint['decoder']
-        decoder = decoder.to(device)
-        decoder.eval()
-        encoder = checkpoint['encoder']
-        encoder = encoder.to(device)
-        encoder.eval()
-
-        # 加载单词映射（word2ix）
-        with open(word_map_path, 'r') as j:
-            word_map = json.load(j)
-        rev_word_map = {v: k for k, v in word_map.items()}  # ix2word
-
-        # 使用注意力和 beam search 进行编码和解码
-        seq, alphas = caption_image_beam_search(encoder, decoder, img_path, word_map, beam_size)
-        alphas = torch.FloatTensor(alphas)
-
-        # 可视化最佳序列的标题和注意力
-        return visualize_att(img_path, seq, alphas, rev_word_map, smooth)
-
-    except Exception as e:
-        print(Fore.YELLOW + "Error loading model:", e)
-        image = Image.open(img_path)
-        image = image.resize((14 * 24, 14 * 24), Image.LANCZOS)
-        # 将 Pillow 图像对象转换为字节流
-        image_byte_array = image.tobytes()
-        # 创建 QImage 对象
-        qt_image = QImage(image_byte_array, image.width, image.height, QImage.Format_RGB888)
-        return qt_image
 
 
 if __name__ == '__main__':
     # 设置参数
-    model_path = 'out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth'  # 模型路径
-    img_path = f'datasets/img/COCO_test2014_000000000069.jpg'  # 图像路径
-    word_map_path = 'out_data/coco/out_hdf5/per_5_freq_5_maxlen_20/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
-    model_path, _, _ = path_checker(model_path, True, False)
-    img_path, _, _ = path_checker(img_path, True, False)
-    word_map_path, _, _ = path_checker(word_map_path, True, False)
+    model_path = 'out_data/flicker/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_11.pth'  # 模型路径
+    img_path = f'datasets/flickr8k/images/44129946_9eeb385d77.jpg'  # 图像路径
+    word_map_path = 'out_data/flicker/out_hdf5/per_5_freq_5_maxlen_52/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
+    model_path,_,_ = path_checker(model_path,True,False)
+    img_path,_,_ = path_checker(img_path,True,False)
+    word_map_path,_,_ = path_checker(word_map_path,True,False)
 
     beam_size = 5  # beam search 的 beam 大小
     smooth = True  # 是否进行 alpha 叠加平滑
 
     # 加载模型
     checkpoint = torch.load(model_path, map_location=str(device))
-    print(Fore.GREEN + 'Model loading from => \n' + str(checkpoint))
-
     decoder = checkpoint['decoder']
     decoder = decoder.to(device)
     decoder.eval()
-
     encoder = checkpoint['encoder']
     encoder = encoder.to(device)
     encoder.eval()
@@ -335,4 +309,5 @@ if __name__ == '__main__':
     seq, alphas = caption_image_beam_search(encoder, decoder, img_path, word_map, beam_size)
     alphas = torch.FloatTensor(alphas)
 
+    # 可视化最佳序列的标题和注意力
     visualize_att(img_path, seq, alphas, rev_word_map, smooth)

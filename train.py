@@ -1,26 +1,23 @@
 import os.path
+import sys
+import threading
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
-from torch import nn
-from nltk.translate.bleu_score import corpus_bleu
-from colorama import init, Fore
-
-import sys
 from PyQt5.QtWidgets import QApplication
-from Win_Qt import MainWindow
-import threading
-from queue import Queue
+from nltk.translate.bleu_score import corpus_bleu
+from torch import nn
 
-from models import Encoder, DecoderWithAttention
-from datasets import *
-from utils import *
+from Win_Qt import MainWindow
 from config import Config
+from datasets import *
+from models import Encoder, DecoderWithAttention
+from utils import *
 
 init()
 
-data_folder = f'out_data/coco/out_hdf5/per_5_freq_5_maxlen_100'  # folder with data files saved by create_input_files.py
+data_folder = f'out_data/coco/out_hdf5/per_5_freq_5_maxlen_20'  # folder with data files saved by create_input_files.py
 data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
 temp_path = 'out_data/coco/save_model'
 
@@ -51,9 +48,20 @@ print_freq = 100  # 每训练多少个批次打印一次训练/验证统计信�
 fine_tune_encoder = False  # 是否对编码器进行微调
 
 # 检查点的路径，如果为 None，则没有检查点
-checkpoint = "out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth"
+train_time = "00:00:00"
+start_time = 0
+number = 0
+window = None
+log_path = os.path.join(temp_path, "save_log.json")
+checkpoint = r"out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq_0.pth"
 checkpoint, _, _ = path_checker(checkpoint, True, False)
-checkpoint = None
+if os.path.exists(checkpoint):
+    file_base = checkpoint.split('_')  # 使用下划线分割文件名
+    number_index = file_base.index('freq') + 1  # 获取编号的索引位置
+    number = int(file_base[number_index].split('.')[0])  # 获取编号并转换为整数
+
+
+# checkpoint = None
 
 
 def main():
@@ -62,7 +70,8 @@ def main():
     """
     config = Config()
 
-    global best_bleu4, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, data_name, word_map
+    global best_bleu4, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, data_name
+    global word_map, train_time, start_time, log_path
 
     # Read word map
     word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
@@ -87,8 +96,11 @@ def main():
         encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
                                              lr=encoder_lr) if fine_tune_encoder else None
 
+        with open(log_path, "w") as file:
+            json.dump({"save_flag": False, "train_time": "00:00:00"}, file)
     else:
         checkpoint = torch.load(checkpoint)
+        train_time = checkpoint['train_time']
         start_epoch = checkpoint['epoch'] + 1
         epochs_since_improvement = checkpoint['epochs_since_improvement']
         best_bleu4 = checkpoint['bleu-4']
@@ -100,12 +112,13 @@ def main():
             encoder.fine_tune(fine_tune_encoder)
             encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
                                                  lr=encoder_lr)
+        with open(log_path, "w") as file:
+            json.dump({"save_flag": False, "train_time": train_time}, file)
         print(Fore.GREEN + 'Model loading from => \n' + str(checkpoint))
         time.sleep(1)
     # Move to GPU, if available
     decoder = decoder.to(device)
     encoder = encoder.to(device)
-
     # Loss function
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -143,7 +156,9 @@ def main():
             if fine_tune_encoder:
                 adjust_learning_rate(encoder_optimizer, 0.8)
 
-        # One epoch's training
+        # 假设训练开始
+        start_time = time.time()
+        # # One epoch's training
         train(train_loader=train_loader,
               encoder=encoder,
               decoder=decoder,
@@ -171,8 +186,13 @@ def main():
             epochs_since_improvement = 0
 
         # Save checkpoint
+        end_time = time.time()
+        elapsed_time_seconds = end_time - start_time
+        start_time = time.time()
+        train_time = record_trian_time(train_time, elapsed_time_seconds)
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best, temp_path)
+                        decoder_optimizer, recent_bleu4, is_best, temp_path, train_time=train_time)
+
         time.sleep(1)
 
 
@@ -188,6 +208,8 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     :param epoch: epoch number
     """
 
+    global train_time, start_time, log_path, number, window
+
     # 设置解码、编码器为训练模式（启用 dropout 和批归一化）
     decoder.train()
     encoder.train()
@@ -200,7 +222,6 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
     # Batches
     with tqdm(total=len(train_loader), desc=f"Training:  Epoch {epoch}/{epochs}") as t:
         for i, (imgs, caps, caplens) in enumerate(train_loader):
-            # data_time.update(time.time() - start)
             # Move to GPU, if available
             imgs = imgs.to(device)
             caps = caps.to(device)
@@ -249,12 +270,21 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
             t.update(1)
             config.check_timeout()
             if config.save_flag:
-                save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                                     decoder_optimizer, 0, temp_path)
+                config.save_flag = False
+                end_time = time.time()
+                elapsed_time_seconds = end_time - start_time
+                start_time = time.time()
+                train_time = record_trian_time(train_time, elapsed_time_seconds)
+                save_temp_checkpoint(data_name, epoch-1, epochs_since_improvement, encoder, decoder, encoder_optimizer,
+                                     decoder_optimizer, 0, temp_path, train_time, number + i + 1)
+                with open(log_path, "w") as file:
+                    json.dump({"save_flag": False, "train_time": train_time}, file)
                 time.sleep(0.05)
+                model_path = r'temp_checkpoint_' + data_name + f'_{str(number + i + 1)}' + '.pth'
+                model_path = os.path.join(temp_path,model_path)
+                window.model_path = model_path
                 continue
 
-            log_path = os.path.join(temp_path, "save_log.json")
             save_flag = False
             try:
                 with open(log_path, "r") as file:
@@ -264,11 +294,18 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                 pass
 
             if save_flag:
-                save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                                     decoder_optimizer, 0, temp_path)
+                end_time = time.time()
+                elapsed_time_seconds = end_time - start_time
+                start_time = time.time()
+                train_time = record_trian_time(train_time, elapsed_time_seconds)
+                save_temp_checkpoint(data_name, epoch-1, epochs_since_improvement, encoder, decoder, encoder_optimizer,
+                                     decoder_optimizer, 0, temp_path, train_time, number + i + 1)
                 time.sleep(0.05)
                 with open(log_path, "w") as file:
-                    json.dump({"save_flag": False}, file)
+                    json.dump({"save_flag": False, "train_time": train_time}, file)
+                model_path = r'temp_checkpoint_' + data_name + f'_{str(number + i + 1)}' + '.pth'
+                model_path = os.path.join(temp_path,model_path)
+                window.model_path = model_path
 
 
 def validate(val_loader, encoder, decoder, criterion, word_map):
@@ -364,14 +401,13 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
 
 if __name__ == '__main__':
     def window_thread():
+        global window
+
         word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
         word_map_file = os.path.normpath(word_map_file)
 
         app = QApplication(sys.argv)
-        filename = 'temp_checkpoint_' + data_name + '.pth'
-        model_path = os.path.join(temp_path, filename)
-        model_path, _, _ = path_checker(model_path, True, False)
-        window = MainWindow(model_path, word_map_file)
+        window = MainWindow(checkpoint, word_map_file)
         window.show()
 
         app.exec_()  # 启动 Qt 主循环
@@ -382,3 +418,4 @@ if __name__ == '__main__':
     window_thread.start()
 
     main()
+    sys.exit()
