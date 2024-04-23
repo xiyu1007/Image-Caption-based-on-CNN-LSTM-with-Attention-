@@ -194,7 +194,6 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
         if step > max_len:
             break
         step += 1
-    print(Fore.BLUE + str(complete_seqs_scores))
     time.sleep(1)
     i = complete_seqs_scores.index(max(complete_seqs_scores))
     seq = complete_seqs[i]
@@ -222,10 +221,10 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
 
     words = [rev_word_map[ind] for ind in seq]
 
-    print(Fore.GREEN + "Caption=> ", end="")
+    print(Fore.BLUE + "\nCaption=> ", end="")
     for w in words:
-        print(Fore.GREEN + str(w), end=" ")
-
+        print(Fore.BLUE + str(w), end=" ")
+    print("")
     plt.figure()
 
     for t in range(len(words)):
@@ -269,7 +268,6 @@ def qt_show(model_path, img_path, word_map_path):
     beam_size = 5  # beam search 的 beam 大小
     smooth = True  # 是否进行 alpha 叠加平滑
     # 加载模型
-    # 加载模型
     try:
         checkpoint = torch.load(model_path, map_location=str(device))
         decoder = checkpoint['decoder']
@@ -292,7 +290,7 @@ def qt_show(model_path, img_path, word_map_path):
         return visualize_att(img_path, seq, alphas, rev_word_map, smooth)
 
     except Exception as e:
-        print(Fore.YELLOW + "Error loading model:", e)
+        print(Fore.YELLOW + "\nError loading model:", e)
         image = Image.open(img_path)
         image = image.resize((14 * 24, 14 * 24), Image.LANCZOS)
         # 将 Pillow 图像对象转换为字节流
@@ -303,10 +301,12 @@ def qt_show(model_path, img_path, word_map_path):
 
 
 if __name__ == '__main__':
+    matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
+
     # 设置参数
-    model_path = 'out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq.pth'  # 模型路径
-    img_path = f'datasets/img/COCO_test2014_000000000069.jpg'  # 图像路径
-    word_map_path = 'out_data/coco/out_hdf5/per_5_freq_5_maxlen_20/WORDMAP_coco_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
+    model_path = 'out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_7.pth'  # 模型路径
+    img_path = f'datasets/img/img.png'  # 图像路径
+    word_map_path = 'out_data/flickr8k/out_hdf5/per_5_freq_5_maxlen_52/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
     model_path, _, _ = path_checker(model_path, True, False)
     img_path, _, _ = path_checker(img_path, True, False)
     word_map_path, _, _ = path_checker(word_map_path, True, False)
