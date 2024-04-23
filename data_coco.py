@@ -1,9 +1,10 @@
 import os
 from pycocotools.coco import COCO
 import csv
-import matplotlib.pyplot as plt
 
-
+"""
+将coco数据集转换为csv文件，这只是为了迎合flickr数据集，因为flickr并没有专门的数据集处理包
+"""
 def coco_to_csv(annFile, csv_path):
     coco = COCO(annFile)
     # 打开CSV文件以写入模式
@@ -33,12 +34,12 @@ def coco_to_csv(annFile, csv_path):
 
 if __name__ == '__main__':
     dataDir = 'datasets/COCO2014/annotations_trainval2014'
-    dataType = 'val2014'  # or 'train2014' for training set
+    dataType = 'val2014'
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
     csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
     coco_to_csv(annFile, csv_path)
 
-    dataType = 'train2014'  # or 'train2014' for training set
+    dataType = 'train2014'
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
     csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
     coco_to_csv(annFile, csv_path)
