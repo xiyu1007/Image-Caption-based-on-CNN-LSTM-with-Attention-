@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torchvision
 # from gensim.models import KeyedVectors
-
 from colorama import init, Fore
 
 # 初始化 colorama
@@ -44,7 +43,7 @@ class Encoder(nn.Module):
         允许或禁止对编码器的卷积块2到4进行梯度计算。
         :param fine_tune: 是否允许微调?
         """
-        # 禁止对整个 ResNet 的梯度计算
+        # 禁止/允许对整个 ResNet 的梯度计算
         # TODO
         for p in self.resnet.parameters():
             p.requires_grad = fine_tune
@@ -73,7 +72,6 @@ class Attention(nn.Module):
     def forward(self, encoder_out, decoder_hidden):
         """
         前向传播。
-
         :param encoder_out: 编码后的图像特征，维度为 (batch_size, num_pixels, encoder_dim)
         :param decoder_hidden: 上一个解码器输出，维度为 (batch_size, decoder_dim)
         :return: 注意力加权编码，权重
@@ -83,7 +81,6 @@ class Attention(nn.Module):
         # 使用线性层将解码器的输出映射到注意力网络的维度
         att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)
         # 计算注意力权重
-        # ( k1 + k2 ) * Wv => V
         att = self.full_att(self.relu(att1 + att2.unsqueeze(1))).squeeze(2)  # (batch_size, num_pixels)
 
         # 使用 softmax 计算权重值
