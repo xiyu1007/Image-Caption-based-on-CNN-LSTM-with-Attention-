@@ -7,6 +7,7 @@ import os
 from colorama import init, Fore
 init()
 
+
 class CaptionDataset(Dataset):
     """
     一个 PyTorch 数据集类，用于在 PyTorch DataLoader 中创建批次。
