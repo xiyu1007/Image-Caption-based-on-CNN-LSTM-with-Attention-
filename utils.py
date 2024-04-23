@@ -196,7 +196,7 @@ def create_input_files(dataset, json_path, image_folder, captions_per_image, min
     :param max_len: don't sample captions longer than this length
     """
 
-    assert dataset in {'coco', 'flickr8k', 'flickr30k'}
+    assert dataset in {'coco', 'flickr8k', 'flickr30k','flickr'}
 
     # Read Karpathy JSON
     with open(json_path, 'r') as j:
@@ -393,7 +393,7 @@ def create_csv(txt_path, csv_path=None):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, temp_path, train_time):
+                    bleu4, is_best, temp_path, train_time,number=0):
     """
     Saves model checkpoint.
 
@@ -411,6 +411,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
              'train_time': train_time,
+             'number': number,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
@@ -433,7 +434,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
 
 def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
                          decoder_optimizer,
-                         bleu4, temp_path, train_time,i):
+                         bleu4, temp_path, train_time,number):
     """
     Saves model checkpoint.
 
@@ -451,19 +452,20 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
     state = {'epoch': epoch,
              'epochs_since_improvement': epochs_since_improvement,
              'train_time': train_time,
+             'number': number,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
-    filename = 'temp_checkpoint_' + data_name + f'_{str(i)}' + '.pth'
+    filename = 'temp_checkpoint_' + data_name + f'_{str(number)}' + '.pth'
     epoch_path = os.path.join(temp_path, filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
     with open(file_path, 'wb') as f:
         torch.save(state, f)
-        # f.flush()  # 强制将缓冲区中的数据写入磁盘
-        # f.close()
+        f.flush()  # 强制将缓冲区中的数据写入磁盘
+        f.close()
     print(Fore.GREEN + "\nSuccessful: save temp model")
     time.sleep(0.01)
 
