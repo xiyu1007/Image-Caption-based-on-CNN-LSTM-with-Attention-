@@ -143,6 +143,7 @@ def main():
 
     # Epochs
     # TODO
+    start_time = time.time()
     for epoch in range(start_epoch, epochs):
         # 如果连续 20 个 epoch 都没有性能提升，则提前终止训练
         if epochs_since_improvement == 20:
@@ -156,7 +157,6 @@ def main():
                 adjust_learning_rate(encoder_optimizer, 0.8)
 
         # 假设训练开始
-        start_time = time.time()
         # # One epoch's training
         train(train_loader=train_loader,
               encoder=encoder,
@@ -190,7 +190,8 @@ def main():
         start_time = time.time()
         train_time = record_trian_time(train_time, elapsed_time_seconds)
         save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
-                        decoder_optimizer, recent_bleu4, is_best, temp_path, train_time=train_time)
+                        decoder_optimizer, recent_bleu4, is_best, temp_path, train_time,number=0)
+        number = 0
 
         time.sleep(1)
 
