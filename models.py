@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torchvision
-# from gensim.models import KeyedVectors
+from torchsummary import summary
 from colorama import init, Fore
 
 # 初始化 colorama
@@ -263,3 +263,15 @@ class DecoderWithAttention(nn.Module):
             alphas[:batch_size_t, t, :] = alpha
         # 返回模型的输出：词预测分数、排序后的编码字幕、解码长度、注意力权重、排序索引
         return predictions, encoded_captions, decode_lengths, alphas, sort_ind
+
+
+if __name__ == '__main__':
+    # 创建模型实例
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    encoder = Encoder()
+    # 将模型移动到可用的设备上
+    encoder.to(device)
+    # 打印模型摘要
+    summary(encoder, input_size=(3, 224, 224))
+    # AdaptiveAvgPool2d - 343[-1, 2048, 14, 14]
