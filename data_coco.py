@@ -33,6 +33,7 @@ def coco_to_csv(annFile, csv_path):
 
 
 if __name__ == '__main__':
+    # TODO
     dataDir = 'datasets/COCO2014/annotations_trainval2014'
     dataType = 'val2014'
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)

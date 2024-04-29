@@ -60,6 +60,11 @@ class CaptionDataset(Dataset):
 
         if self.split == 'TRAIN':
             return img, caption, caplen
+        elif self.split == 'TEST':
+            pri_image = self.imgs[i // self.cpi]
+            all_captions = torch.LongTensor(
+                self.captions[((i // self.cpi) * self.cpi):(((i // self.cpi) * self.cpi) + self.cpi)])
+            return img, caption, caplen, all_captions,pri_image
         else:
             """
             如果数据集的划分不是训练集，即验证集或测试集，它会额外返回所有与该图像关联的多个标题（all_captions）。

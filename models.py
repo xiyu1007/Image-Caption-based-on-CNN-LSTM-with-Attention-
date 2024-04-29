@@ -44,7 +44,7 @@ class Encoder(nn.Module):
         :param fine_tune: 是否允许微调?
         """
         # 禁止/允许对整个 ResNet 的梯度计算
-        # TODO
+        # TODO 可以选择对部分层微调
         for p in self.resnet.parameters():
             p.requires_grad = fine_tune
 
@@ -216,7 +216,6 @@ class DecoderWithAttention(nn.Module):
         # 创建张量以保存词预测分数和注意力权重
         predictions = torch.zeros(batch_size, max(decode_lengths), vocab_size).to(device)
         alphas = torch.zeros(batch_size, max(decode_lengths), num_pixels).to(device)
-
         # 在每个时间步进行解码
         # 通过基于解码器先前隐藏状态输出的注意力权重来加权编码器的输出
         # 然后使用先前的单词和注意力加权编码生成解码器中的新单词
@@ -268,7 +267,6 @@ class DecoderWithAttention(nn.Module):
 if __name__ == '__main__':
     # 创建模型实例
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     encoder = Encoder()
     # 将模型移动到可用的设备上
     encoder.to(device)

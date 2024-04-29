@@ -19,7 +19,7 @@ init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=5, max_len=20):
+def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=5, max_len=35):
     """
     读取图像并使用 beam search 进行字幕生成。
     :param encoder: 编码器模型
@@ -155,10 +155,9 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
         else:
             top_k_scores, top_k_words = scores.view(-1).topk(k, 0, True, True)  # (s)
 
-        prev_word_inds = top_k_words // vocab_size  # (s)
         # next_word_inds = top_k_words % vocab_size  # (s)
-
         # prev_word_inds = torch.div(top_k_words, vocab_size, rounding_mode='floor')  # (s)
+        prev_word_inds = top_k_words // vocab_size  # (s)
         next_word_inds = top_k_words % vocab_size  # (s)
 
         seqs = torch.cat([seqs[prev_word_inds], next_word_inds.unsqueeze(1)], dim=1)  # (s, step+1)

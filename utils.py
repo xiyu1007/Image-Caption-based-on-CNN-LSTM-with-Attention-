@@ -6,12 +6,16 @@ import time
 from collections import Counter
 from random import seed, choice, sample
 import h5py
+import matplotlib
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
+from ipywidgets import interact, fixed
+
+from matplotlib import pyplot as plt, image as mpimg
 from tqdm import tqdm
 
 from colorama import init, Fore
+
 
 init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,9 +45,9 @@ def record_trian_time(train_time, elapsed_time_seconds):
 
 
 def caps_to_hot(batch_size, targets, max_length, word_map=None):
-    if not word_map:
-        global Word_map
-        word_map = Word_map
+    if word_map is None:
+        print(Fore.YELLOW + "\nto_caps() => word_map is None")
+        assert word_map is not None
     one_hot = []
     for batch in range(batch_size):
         one_hot.append([])
@@ -56,10 +60,11 @@ def caps_to_hot(batch_size, targets, max_length, word_map=None):
 
 # score_to_caps
 def to_caps(hot_list, is_all_hot=False, word_map=None):
+    if word_map is None:
+        print(Fore.YELLOW + "\nto_caps() => word_map is None")
+        assert word_map is not None
     caps = list()
-    if not word_map:
-        global Word_map
-        word_map = Word_map
+
     for i, all_h in enumerate(hot_list):
         caps.append([])
         cap = ''
@@ -196,7 +201,7 @@ def create_input_files(dataset, json_path, image_folder, captions_per_image, min
     :param max_len: don't sample captions longer than this length
     """
 
-    assert dataset in {'coco', 'flickr8k', 'flickr30k','flickr'}
+    # assert dataset in {'coco', 'flickr8k', 'flickr30k', 'flickr'}
 
     # Read Karpathy JSON
     with open(json_path, 'r') as j:
@@ -347,6 +352,8 @@ def create_input_files(dataset, json_path, image_folder, captions_per_image, min
 
 
 def path_checker(path, is_file=False, is_create=True):
+    if not path:
+        return None, None, None
     path = os.path.abspath(path)
     base_name = os.path.basename(path)
     dir_path = os.path.dirname(path)
@@ -393,7 +400,7 @@ def create_csv(txt_path, csv_path=None):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, temp_path, train_time,number=0):
+                    bleu4, is_best, model_save_path, train_time, number=0):
     """
     Saves model checkpoint.
 
@@ -418,8 +425,8 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
     filename = 'checkpoint_' + data_name + '_epoch_' + str(epoch) + '.pth'
-    epoch_path = os.path.join(temp_path, filename)
-    best_path = os.path.join(temp_path, 'BEST_' + filename)
+    epoch_path = os.path.join(model_save_path, filename)
+    best_path = os.path.join(model_save_path, 'BEST_' + filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
     torch.save(state, file_path)
@@ -434,7 +441,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
 
 def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
                          decoder_optimizer,
-                         bleu4, temp_path, train_time,number):
+                         bleu4, model_save_path, train_time, number):
     """
     Saves model checkpoint.
 
@@ -458,8 +465,8 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
              'decoder': decoder,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
-    filename = 'temp_checkpoint_' + data_name + f'_{str(number)}' + '.pth'
-    epoch_path = os.path.join(temp_path, filename)
+    filename = 'temp_checkpoint_' + data_name + f'_epoch_{epoch}_batch_{str(number)}' + '.pth'
+    epoch_path = os.path.join(model_save_path, filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
     with open(file_path, 'wb') as f:
@@ -479,7 +486,32 @@ def adjust_learning_rate(optimizer, shrink_factor):
     print("\nDECAYING learning rate.")
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr'] * shrink_factor
-    print("The new learning rate is %f\n" % (optimizer.param_groups[0]['lr'],))
+    print("The new learning rate is %.6f\n" % (optimizer.param_groups[0]['lr'],))
+
+
+def img_show(img, candidate, reference, is_path=False, save_path=None,id=0,bottom=0.35):
+    # matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
+    fig, ax = plt.subplots()
+    ax.set_title('\n' + str(candidate))
+
+    for i, re in enumerate(reference):
+        ax.text(0.5, -0.1 * (i + 1), re, horizontalalignment='center', verticalalignment='center',
+                transform=ax.transAxes, fontsize=12)  # 在图像下方添加标题
+
+    if not is_path:
+        ax.imshow(img)
+    else:
+        image = mpimg.imread(img)
+        ax.imshow(image)
+
+    ax.axis('off')  # 关闭坐标轴
+    plt.subplots_adjust(bottom=bottom)  # 设置子图的 bottom 参数，初始值为 0.1
+
+    if save_path:
+        plt.savefig(os.path.join(save_path, str(f"img_{id}") + '.png'))
+        plt.close()
+
+    # plt.show()
 
 
 if __name__ == '__main__':

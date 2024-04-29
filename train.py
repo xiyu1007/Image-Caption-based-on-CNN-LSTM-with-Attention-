@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication
 from torch import nn
+from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
 from Win_Qt import MainWindow
 from datasets import *
@@ -43,7 +44,7 @@ cudnn.benchmark = True
 start_epoch = 0  # 开始的训练轮次
 epochs = 100  # 训练的总轮次
 epochs_since_improvement = 0  # 自上次在验证集上取得改进以来的轮次数，用于提前停止
-batch_size = 32  # 32 每个训练批次中的样本数
+batch_size = 16  # 32 每个训练批次中的样本数
 workers = 0  # 数据加载的工作进程数 num_workers参数设置为0，这将使得数据加载在主进程中进行，而不使用多进程。
 # 这个错误是由于h5py对象无法被序列化（pickled）引起的。
 # 在使用多进程（multiprocessing）加载数据时，数据加载器（DataLoader）会尝试对每个批次的数据进行序列化，以便在不同的进程中传递。
@@ -128,9 +129,6 @@ def main():
     #     dataset,
     #     batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=True,
     #     sampler=torch.utils.data.sampler.SequentialSampler(range(number * batch_size, len(dataset))))
-    # train_loader = torch.utils.data.DataLoader(
-    #     CaptionDataset(data_folder, data_name, 'TRAIN', transform=transform),
-    #     batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=True)
     val_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_folder, data_name, 'VAL', transform=transform),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
@@ -139,15 +137,14 @@ def main():
     # TODO
     start_time = time.time()
     for epoch in range(start_epoch, epochs):
-        # 设置种子以确保可重复性
-        seed = 42 * (epoch + 10)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+        torch.manual_seed(52 + (epoch * 100))
         dataset = CaptionDataset(data_folder, data_name, 'TRAIN', transform=transform)
+        subset_indices = list(range(number * batch_size, len(dataset)))
+        # 使用 Subset 类来创建数据集的部分子集
+        subset_dataset = Subset(dataset, subset_indices)
         train_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=batch_size, shuffle=False, num_workers=workers, pin_memory=True,
-            sampler=torch.utils.data.sampler.SequentialSampler(range(number * batch_size, len(dataset))))
+            subset_dataset,
+            batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
         # 如果连续 20 个 epoch 都没有性能提升，则提前终止训练
         if epochs_since_improvement == 20:
             break
@@ -289,8 +286,10 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
                     adjust_learning_rate(encoder_optimizer, 0.85)
 
             writer.add_scalar('Train/learning_rate',decoder_optimizer.param_groups[0]['lr'], i)
+            # 在损失和准确率更新后
             writer.add_scalars('Train/Loss', {'val': losses.val, 'avg': losses.avg}, i)
             writer.add_scalars('Train/Top5Accuracy', {'val': top5accs.val, 'avg': top5accs.avg}, i)
+
             # if i % 5 == 0:
             elapsed_time_seconds = time.time() - start_time
             window.set_train_time(record_trian_time(train_time, elapsed_time_seconds), number + i, epoch)
