@@ -18,12 +18,15 @@ torch.hub.set_dir(models_download_path)
 
 
 class Encoder(nn.Module):
-    def __init__(self, encoded_image_size=14):
+    def __init__(self, use_pre_resnet=True, encoded_image_size=14):
         super(Encoder, self).__init__()
         # 设置编码后的图像大小
         self.encoded_image_size = encoded_image_size
-        resnet = torchvision.models.resnet101 \
-            (weights=torchvision.models.resnet.ResNet101_Weights.IMAGENET1K_V2)
+        if use_pre_resnet:
+            resnet = torchvision.models.resnet101 \
+                (weights=torchvision.models.resnet.ResNet101_Weights.IMAGENET1K_V2)
+        else:
+            resnet = torchvision.models.resnet101()
         # 移除线性层和池化层（因为我们不进行分类任务）
         modules = list(resnet.children())[:-2]
         self.resnet = nn.Sequential(*modules)

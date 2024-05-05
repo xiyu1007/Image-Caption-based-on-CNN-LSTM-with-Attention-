@@ -180,8 +180,8 @@ def evaluate(beam_size=5, max_len=35):
                     break
                 step += 1
 
-            i = complete_seqs_scores.index(max(complete_seqs_scores))
-            seq = complete_seqs[i]
+            k = complete_seqs_scores.index(max(complete_seqs_scores))
+            seq = complete_seqs[k]
 
             # References
             img_caps = allcaps[0].tolist()
@@ -202,14 +202,13 @@ def evaluate(beam_size=5, max_len=35):
             caps = to_caps([candidate], is_all_hot=False, word_map=word_map)
             pri_image = pri_image.squeeze(0).tolist()
             pri_image = np.transpose(pri_image, (1, 2, 0))
-            img_show(pri_image, caps, refer, False,pre_save_path,i)
+            img_show(pri_image, caps, refer, False,pre_save_path,i,False)
 
             # Calculate  scores
             bleu.update(get_bleu([reference], [candidate]))
             rouge.update(get_rouge([reference], [candidate]))
             writer.add_scalars('Test/bleu', {'val': bleu.val, 'avg': bleu.avg}, i)
             writer.add_scalars('Test/rouge', {'val': rouge.val, 'avg': rouge.avg}, i)
-
             t.set_postfix(bleu=f'{bleu.val * 100.0:.3f}({bleu.avg * 100.0:.3f})',
                           rouge=f'{rouge.val * 100.0:.3f}({rouge.avg * 100.0:.3f})')
 

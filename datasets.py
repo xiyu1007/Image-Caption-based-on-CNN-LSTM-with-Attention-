@@ -4,9 +4,6 @@ import h5py
 import json
 import os
 
-from colorama import init, Fore
-init()
-
 
 class CaptionDataset(Dataset):
     """
@@ -60,7 +57,7 @@ class CaptionDataset(Dataset):
 
         if self.split == 'TRAIN':
             return img, caption, caplen
-        elif self.split == 'TEST':
+        elif self.split == 'TESTdatasets.py':
             pri_image = self.imgs[i // self.cpi]
             all_captions = torch.LongTensor(
                 self.captions[((i // self.cpi) * self.cpi):(((i // self.cpi) * self.cpi) + self.cpi)])

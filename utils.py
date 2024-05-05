@@ -1,4 +1,6 @@
 import csv
+import shutil
+
 import cv2
 import json
 import os
@@ -16,9 +18,41 @@ from tqdm import tqdm
 
 from colorama import init, Fore
 
-
 init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def log_write(src_dir, dst_dir,remove_dst=False):
+    if not os.path.exists(src_dir):
+        if remove_dst:
+            if os.path.exists(dst_dir):
+                shutil.rmtree(dst_dir)
+                os.makedirs(dst_dir, exist_ok=True)
+                print(Fore.YELLOW + "\nlog_write--remove path:  ", dst_dir)
+        print(Fore.YELLOW + "\nlog_write--path is not exists: ", src_dir)
+        return
+    if os.path.exists(dst_dir):
+        shutil.rmtree(dst_dir)
+    os.makedirs(dst_dir, exist_ok=True)
+
+    try:
+        # 获取源目录下所有的文件和子目录
+        for item in os.listdir(src_dir):
+            item_path = os.path.join(src_dir, item)
+
+            # 如果是文件就复制文件
+            if os.path.isfile(item_path):
+                shutil.copy(item_path, dst_dir)
+            # 如果是目录就复制整个目录
+            elif os.path.isdir(item_path):
+                dst_item_path = os.path.join(dst_dir, item)
+                shutil.copytree(item_path, dst_item_path)
+        print(Fore.BLUE + "\nSuccess logs exchange:")
+        print(Fore.BLUE + src_dir + Fore.GREEN + " => " + Fore.BLUE + dst_dir)
+        # shutil.rmtree(src_dir)
+
+    except Exception as e:
+        print(Fore.YELLOW + "\nError log_write: ", e)
 
 
 # 将时间字符串转换为秒
@@ -400,7 +434,7 @@ def create_csv(txt_path, csv_path=None):
 
 
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
-                    bleu4, is_best, model_save_path, train_time, number=0):
+                    bleu4, is_best, model_save_path, train_time, losses, top5accs, number=0):
     """
     Saves model checkpoint.
 
@@ -419,6 +453,8 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
              'epochs_since_improvement': epochs_since_improvement,
              'train_time': train_time,
              'number': number,
+             'losses': losses,
+             'top5accs': top5accs,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
@@ -429,6 +465,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
     best_path = os.path.join(model_save_path, 'BEST_' + filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     torch.save(state, file_path)
     print(Fore.GREEN + "Successful: save model")
     time.sleep(0.01)
@@ -441,7 +478,7 @@ def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder
 
 def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer,
                          decoder_optimizer,
-                         bleu4, model_save_path, train_time, number):
+                         bleu4, model_save_path, train_time, losses, top5accs, number):
     """
     Saves model checkpoint.
 
@@ -460,6 +497,8 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
              'epochs_since_improvement': epochs_since_improvement,
              'train_time': train_time,
              'number': number,
+             'losses': losses,
+             'top5accs': top5accs,
              'bleu-4': bleu4,
              'encoder': encoder,
              'decoder': decoder,
@@ -469,6 +508,8 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
     epoch_path = os.path.join(model_save_path, filename)
     file_path, _, _ = \
         path_checker(epoch_path, True, False)
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'wb') as f:
         torch.save(state, f)
         f.flush()  # 强制将缓冲区中的数据写入磁盘
@@ -483,13 +524,13 @@ def adjust_learning_rate(optimizer, shrink_factor):
     :param optimizer: optimizer whose learning rate must be shrunk.
     :param shrink_factor: factor in interval (0, 1) to multiply learning rate with.
     """
-    print("\nDECAYING learning rate.")
+    print(Fore.BLUE + "\nDECAYING learning rate.")
     for param_group in optimizer.param_groups:
         param_group['lr'] = param_group['lr'] * shrink_factor
-    print("The new learning rate is %.6f\n" % (optimizer.param_groups[0]['lr'],))
+    print(Fore.BLUE + "The new learning rate is %.6f\n" % (optimizer.param_groups[0]['lr'],))
 
 
-def img_show(img, candidate, reference, is_path=False, save_path=None,id=0,bottom=0.35):
+def img_show(img, candidate, reference, is_path=False, save_path=None, id=0, show=False, bottom=0.35):
     # matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
     fig, ax = plt.subplots()
     ax.set_title('\n' + str(candidate))
@@ -509,9 +550,9 @@ def img_show(img, candidate, reference, is_path=False, save_path=None,id=0,botto
 
     if save_path:
         plt.savefig(os.path.join(save_path, str(f"img_{id}") + '.png'))
+        if show:
+            plt.show()
         plt.close()
-
-    # plt.show()
 
 
 if __name__ == '__main__':

@@ -167,7 +167,7 @@ def data_flicker():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'flickr8k'
+    dataset_name = 'flickr'
 
     csv_path = ['datasets/flickr8k/captions.csv']
     # TODO 修改从flickr官网下载到的captions.txt路径
@@ -175,7 +175,6 @@ def data_flicker():
 
     image_folder = ['datasets/flickr8k/images']
     split_type = None
-    data_len = None
     data_len = None
     per = 5
     freq = 1
@@ -191,7 +190,7 @@ def data_flicker():
     csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model = \
         check_file(csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model)
 
-    # create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type, data_len=data_len)
+    create_csv_to_json(dataset_name, csv_path, image_folder, output_path_json, split_type=split_type, data_len=data_len)
 
     path_checker(json_path, True, False)
     # captions_per_image:5  min_word_freq: 5
@@ -206,7 +205,7 @@ def data_coco():
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
     # TODO csv_path: from data_coco.py
-    dataset_name = 'coco'
+    dataset_name = 'coco_no_premodel'
     csv_path = ['datasets/COCO2014/coco_train2014.csv',
                 'datasets/COCO2014/coco_val2014.csv']
     image_folder = ['datasets/COCO2014/train2014',
@@ -215,10 +214,10 @@ def data_coco():
     split_type = ['train', 'val']
     # 这里可以指定数据集长度
     # data_len = [10000,2000]
-    data_len = None
+    data_len = [30000,3000]
     per = 5
-    freq = 5
-    max_len = 20
+    freq = 1
+    max_len = 50
     out_path = f'out_data/{dataset_name}/'
 
     output_path_json = '{}out_json'.format(out_path)
