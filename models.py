@@ -43,19 +43,20 @@ class Encoder(nn.Module):
 
     def fine_tune(self, fine_tune=False):
         """
-        允许或禁止对编码器的卷积块2到4进行梯度计算。
+        允许或禁止对编码器的卷积块1到4进行梯度计算。
         :param fine_tune: 是否允许微调?
         """
+        # 冻结卷积块 1 到 3，仅允许微调后续的层
         # 禁止/允许对整个 ResNet 的梯度计算
         # TODO 可以选择对部分层微调
         for p in self.resnet.parameters():
-            p.requires_grad = fine_tune
+            p.requires_grad = False
 
-        # 如果允许微调，仅允许微调卷积块2到4
-        # if fine_tune:
-        #     for c in list(self.resnet.children())[4:]:
-        #         for p in c.parameters():
-        #             p.requires_grad = fine_tune
+        # 如果允许微调，仅允许微调卷积块4到:
+        if fine_tune:
+            for c in list(self.resnet.children())[4:]:
+                for p in c.parameters():
+                    p.requires_grad = fine_tune
 
 
 class Attention(nn.Module):
@@ -271,8 +272,11 @@ if __name__ == '__main__':
     # 创建模型实例
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     encoder = Encoder()
+    # print(encoder)
+    # 打印ResNet每一层的名称
+
     # 将模型移动到可用的设备上
     encoder.to(device)
     # 打印模型摘要
-    summary(encoder, input_size=(3, 224, 224))
+    # summary(encoder, input_size=(3, 224, 224))
     # AdaptiveAvgPool2d - 343[-1, 2048, 14, 14]

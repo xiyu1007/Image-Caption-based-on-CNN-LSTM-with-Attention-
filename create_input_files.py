@@ -167,7 +167,7 @@ def data_flicker():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'flickr'
+    dataset_name = 'flickr_use_premodel'
 
     csv_path = ['datasets/flickr8k/captions.csv']
     # TODO 修改从flickr官网下载到的captions.txt路径
@@ -205,7 +205,7 @@ def data_coco():
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
     # TODO csv_path: from data_coco.py
-    dataset_name = 'coco_no_premodel'
+    dataset_name = 'coco_use_premodel'
     csv_path = ['datasets/COCO2014/coco_train2014.csv',
                 'datasets/COCO2014/coco_val2014.csv']
     image_folder = ['datasets/COCO2014/train2014',
@@ -213,8 +213,8 @@ def data_coco():
 
     split_type = ['train', 'val']
     # 这里可以指定数据集长度
-    # data_len = [10000,2000]
-    data_len = [30000,3000]
+    data_len = None
+    # data_len = [30000,3000]
     per = 5
     freq = 1
     max_len = 50
@@ -238,5 +238,5 @@ def data_coco():
 
 
 if __name__ == '__main__':
-    data_flicker()
-    # data_coco()
+    # data_flicker()
+    data_coco()

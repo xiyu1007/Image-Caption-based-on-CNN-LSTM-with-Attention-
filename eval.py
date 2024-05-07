@@ -207,10 +207,12 @@ def evaluate(beam_size=5, max_len=35):
             # Calculate  scores
             bleu.update(get_bleu([reference], [candidate]))
             rouge.update(get_rouge([reference], [candidate]))
+            # Write validation metrics to TensorBoard
+
             writer.add_scalars('Test/bleu', {'val': bleu.val, 'avg': bleu.avg}, i)
             writer.add_scalars('Test/rouge', {'val': rouge.val, 'avg': rouge.avg}, i)
-            t.set_postfix(bleu=f'{bleu.val * 100.0:.3f}({bleu.avg * 100.0:.3f})',
-                          rouge=f'{rouge.val * 100.0:.3f}({rouge.avg * 100.0:.3f})')
+            t.set_postfix(bleu=f'{bleu.val * 100.0:.3f}%({bleu.avg * 100.0:.3f})%',
+                          rouge=f'{rouge.val * 100.0:.3f}%({rouge.avg * 100.0:.3f})%')
 
 
 if __name__ == '__main__':

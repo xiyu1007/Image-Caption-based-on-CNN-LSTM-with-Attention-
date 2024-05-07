@@ -10,6 +10,7 @@ from random import seed, choice, sample
 import h5py
 import matplotlib
 import numpy as np
+import pynvml
 import torch
 from ipywidgets import interact, fixed
 
@@ -22,7 +23,7 @@ init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def log_write(src_dir, dst_dir,remove_dst=False):
+def log_write(src_dir, dst_dir, remove_dst=False):
     if not os.path.exists(src_dir):
         if remove_dst:
             if os.path.exists(dst_dir):
@@ -530,14 +531,16 @@ def adjust_learning_rate(optimizer, shrink_factor):
     print(Fore.BLUE + "The new learning rate is %.6f\n" % (optimizer.param_groups[0]['lr'],))
 
 
-def img_show(img, candidate, reference, is_path=False, save_path=None, id=0, show=False, bottom=0.35):
+def img_show(img, candidate=None, reference=None, is_path=False, save_path=None, id=0, show=False, bottom=0.35):
     # matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
     fig, ax = plt.subplots()
-    ax.set_title('\n' + str(candidate))
+    if candidate is not None:
+        ax.set_title('\n' + str(candidate))
 
-    for i, re in enumerate(reference):
-        ax.text(0.5, -0.1 * (i + 1), re, horizontalalignment='center', verticalalignment='center',
-                transform=ax.transAxes, fontsize=12)  # 在图像下方添加标题
+    if reference is not None:
+        for i, re in enumerate(reference):
+            ax.text(0.5, -0.1 * (i + 1), re, horizontalalignment='center', verticalalignment='center',
+                    transform=ax.transAxes, fontsize=12)  # 在图像下方添加标题
 
     if not is_path:
         ax.imshow(img)
@@ -548,11 +551,38 @@ def img_show(img, candidate, reference, is_path=False, save_path=None, id=0, sho
     ax.axis('off')  # 关闭坐标轴
     plt.subplots_adjust(bottom=bottom)  # 设置子图的 bottom 参数，初始值为 0.1
 
+    if show:
+        plt.show()
     if save_path:
         plt.savefig(os.path.join(save_path, str(f"img_{id}") + '.png'))
-        if show:
-            plt.show()
         plt.close()
+
+
+def print_gpu_utilization():
+    # 检查GPU是否可用
+    if torch.cuda.is_available():
+        # 获取GPU数量
+        num_gpu = torch.cuda.device_count()
+        print("Number of available GPUs:", num_gpu)
+
+        # 遍历每个GPU并打印详细信息
+        for i in range(num_gpu):
+            gpu_properties = torch.cuda.get_device_properties(i)
+            print("GPU {} Properties:".format(i))
+            print("  Name:", gpu_properties.name)
+            print("  CUDA Capability:", gpu_properties.major, gpu_properties.minor)
+            print("  Memory Total (MB):", gpu_properties.total_memory / (1024 ** 2))
+    else:
+        print("No GPU available, using CPU.")
+    pynvml.nvmlInit()
+    num_gpus = pynvml.nvmlDeviceGetCount()
+
+    for i in range(num_gpus):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
+        print("GPU {} Utilization: {}%".format(i, utilization.gpu))
+
+    pynvml.nvmlShutdown()
 
 
 if __name__ == '__main__':
