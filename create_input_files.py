@@ -172,13 +172,15 @@ def data_flicker():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'Flickr8k'
+    dataset_name = 'thesis'
+    csv_path = ['datasets/thesis.csv']
 
-    csv_path = ['datasets/Flickr8k/captions.csv']
-    # TODO 修改从flickr官网下载到的captions.txt路径
-    create_csv(f'datasets/flickr8k/captions.txt', csv_path[0])
+    # csv_path = ['datasets/Flickr8k/captions.csv']
+    # # TODO 修改从flickr官网下载到的captions.txt路径
+    # create_csv(f'datasets/flickr8k/captions.txt', csv_path[0])
 
-    image_folder = ["datasets/Flickr8k/Images"]
+    # image_folder = ["datasets/Flickr8k/Images"]
+    image_folder = None
     split_type = None
     data_len = None
     per = 5
@@ -244,13 +246,13 @@ def data_coco():
 
 if __name__ == '__main__':
     # 要处理的多个 CSV 文件所在的文件夹路径列表
-    # folder_path = ['datasets/COCO2014/coco_train2014.csv', 'datasets/COCO2014/coco_val2014.csv',
-    #                'datasets/flickr8k/captions.csv']
-    #
-    # # 图片文件夹路径列表，与 folder_path 对应
-    # image_folders = ['datasets/COCO2014/train2014', 'datasets/COCO2014/val2014',
-    #                  'datasets/flickr8k/images']
+    folder_path = ['datasets/coco/coco_train2014.csv', 'datasets/coco/coco_val2014.csv',
+                   'datasets/Flickr8k/captions.csv']
 
-    # csv_inte(folder_path,image_folders)
-    # data_flicker()
-    data_coco()
+    # 图片文件夹路径列表，与 folder_path 对应
+    image_folders = ['datasets/coco/train2014', 'datasets/coco/val2014',
+                     'datasets/Flickr8k/Images']
+
+    csv_inte(folder_path,image_folders,new_csv_path="./datasets/thesis.csv")
+    data_flicker()
+    # data_coco()
