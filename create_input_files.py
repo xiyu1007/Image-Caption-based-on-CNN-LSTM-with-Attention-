@@ -5,7 +5,7 @@ from colorama import init, Fore
 import pandas as pd
 from tqdm import tqdm
 
-from utils import path_checker, create_input_files, create_csv
+from utils import path_checker, create_input_files, create_csv,csv_inte
 
 # 初始化 colorama
 init(autoreset=True)
@@ -29,7 +29,8 @@ class DatasetConverter:
         self.image_folder = image_folder
         if split_type:
             assert len(split_type) == len(csv_path)
-        assert len(csv_path) == len(image_folder)
+        if image_folder:
+            assert len(csv_path) == len(image_folder)
 
         self.data_name = data_name
         self.output_path_json = output_path_json
@@ -57,8 +58,11 @@ class DatasetConverter:
 
             # 根据图片名称组织数据
             for image_name, group in tqdm(df.groupby('image_name'), desc="CSV-Processing"):
-                filepath = os.path.join(self.image_folder[i], str(image_name))
-                filepath = os.path.normpath(filepath)
+                if self.image_folder is not None:
+                    filepath = os.path.join(self.image_folder[i], str(image_name))
+                    filepath = os.path.normpath(filepath)
+                else:
+                    filepath = image_name
                 if not os.path.exists(filepath):
                     none_path.append(filepath)
                     continue
@@ -118,7 +122,7 @@ class DatasetConverter:
 
     def write_parameters_to_json(self, none_path, json_path='parameters'):
         json_path, _, _ = path_checker(os.path.join(self.output_path_json, self.data_name + '_' + json_path + '.json'),
-                                       True, False)
+                                       True, True)
         """
         将参数写入JSON文件
         :param json_path: 输出JSON文件路径
@@ -147,8 +151,9 @@ class DatasetConverter:
 def check_file(csv_path, image_folder, output_path_json, output_path_hdf5, output_path_model):
     for i, c in enumerate(csv_path):
         csv_path[i], _, _ = path_checker(c, is_file=True, is_create=False)
-    for i, c in enumerate(image_folder):
-        image_folder[i], _, _ = path_checker(c, is_file=False, is_create=False)
+    if image_folder:
+        for i, c in enumerate(image_folder):
+            image_folder[i], _, _ = path_checker(c, is_file=False, is_create=False)
     output_path_json, _, _ = path_checker(output_path_json, is_file=False, is_create=True)
     output_path_hdf5, _, _ = path_checker(output_path_hdf5, is_file=False, is_create=True)
     output_path_model, _, _ = path_checker(output_path_model, is_file=False, is_create=True)
@@ -167,13 +172,13 @@ def data_flicker():
     # 使用示例
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
-    dataset_name = 'flickr_use_premodel'
+    dataset_name = 'Flickr8k'
 
-    csv_path = ['datasets/flickr8k/captions.csv']
+    csv_path = ['datasets/Flickr8k/captions.csv']
     # TODO 修改从flickr官网下载到的captions.txt路径
     create_csv(f'datasets/flickr8k/captions.txt', csv_path[0])
 
-    image_folder = ['datasets/flickr8k/images']
+    image_folder = ["datasets/Flickr8k/Images"]
     split_type = None
     data_len = None
     per = 5
@@ -205,11 +210,11 @@ def data_coco():
     # csv data to json
     # csv among heads no space <==> image_name|comment_number|comment
     # TODO csv_path: from data_coco.py
-    dataset_name = 'coco_use_premodel'
-    csv_path = ['datasets/COCO2014/coco_train2014.csv',
-                'datasets/COCO2014/coco_val2014.csv']
-    image_folder = ['datasets/COCO2014/train2014',
-                    'datasets/COCO2014/val2014']
+    dataset_name = 'coco'
+    csv_path = ['datasets/coco/coco_train2014.csv',
+                'datasets/coco/coco_val2014.csv']
+    image_folder = ['datasets/coco/train2014',
+                    'datasets/coco/val2014']
 
     split_type = ['train', 'val']
     # 这里可以指定数据集长度
@@ -238,5 +243,14 @@ def data_coco():
 
 
 if __name__ == '__main__':
+    # 要处理的多个 CSV 文件所在的文件夹路径列表
+    # folder_path = ['datasets/COCO2014/coco_train2014.csv', 'datasets/COCO2014/coco_val2014.csv',
+    #                'datasets/flickr8k/captions.csv']
+    #
+    # # 图片文件夹路径列表，与 folder_path 对应
+    # image_folders = ['datasets/COCO2014/train2014', 'datasets/COCO2014/val2014',
+    #                  'datasets/flickr8k/images']
+
+    # csv_inte(folder_path,image_folders)
     # data_flicker()
     data_coco()

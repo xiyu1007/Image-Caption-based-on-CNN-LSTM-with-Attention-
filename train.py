@@ -1,16 +1,14 @@
 import os.path
 import sys
 import threading
-import time
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
 from PyQt5.QtGui import QFont, QIcon
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QApplication
 from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
-import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter
 from Win_Qt import MainWindow
@@ -23,24 +21,25 @@ init()
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 # TODO 修改路径
-datasets_name = 'coco_use_premodel'
-writer = SummaryWriter()
+datasets_name = 'thesis'
 data_folder = f'out_data/{datasets_name}/out_hdf5/per_5_freq_1_maxlen_50'  # folder with data files saved by create_input_files.py
 data_name = f'{datasets_name}_5_cap_per_img_1_min_word_freq'  # base name shared by data files
 model_save_path = f'out_data/{datasets_name}/save_model'
 
 # checkpoint = None
-checkpoint = "out_data/coco_use_premodel/save_model/temp_checkpoint_coco_use_premodel_5_cap_per_img_1_min_word_freq_epoch_0_batch_11957.pth"
-# TODO nodel : Resnet no pre
-use_pre_resnet = True
-is_new_epoch = False
+checkpoint = "out_data/thesis/save_model/checkpoint_thesis_5_cap_per_img_1_min_word_freq_epoch_19.pth"
+
+is_new_epoch = True
 checkpoint, _, _ = path_checker(checkpoint, True, False)
+fine_tune_encoder = True  # 是否对编码器进行微调 7 begin
 
 # Model parameters
-emb_dim = 512  # 词嵌入的维度
+# TODO nodel : Resnet no pre
+use_pre_resnet = False
+emb_dim = 1024  # 词嵌入的维度
 attention_dim = 1024  # TODO 512  注意力机制中线性层的维度
-decoder_dim = 512  # 解码器RNN的维度
-dropout = 0.3  # TODO 0.5
+decoder_dim = 1024  # 解码器RNN的维度
+dropout = 0.5  # TODO 0.5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # （仅当模型的输入具有固定大小时设置为true；否则会有很多计算开销）
@@ -50,23 +49,24 @@ cudnn.benchmark = False
 start_epoch = 0  # 开始的训练轮次
 epochs = 20  # 训练的总轮次
 epochs_since_improvement = 0  # 自上次在验证集上取得改进以来的轮次数，用于提前停止
-batch_size = 32  # 32 每个训练批次中的样本数
+batch_size = 64  # 32 每个训练批次中的样本数
 workers = 0  # 数据加载的工作进程数 num_workers参数设置为0，这将使得数据加载在主进程中进行，而不使用多进程。
 # 这个错误是由于h5py对象无法被序列化（pickled）引起的。
 # 在使用多进程（multiprocessing）加载数据时，数据加载器（DataLoader）会尝试对每个批次的数据进行序列化，以便在不同的进程中传递。
 encoder_lr = 1e-4  # 编码器的学习率（如果进行微调）
 decoder_lr = 4e-4  # 解码器的学习率
-gama_decoder = 0.95
+gama_decoder = 0.98
 gama_encoder = 0.95
 grad_clip = 5.  # 梯度裁剪的阈值，用于防止梯度爆炸
 alpha_c = 1.  # '双重随机注意力'的正则化参数
 best_bleu4 = 0.  # 当前的最佳 BLEU-4 分数
-fine_tune_encoder = False  # 是否对编码器进行微调
 
 train_time = "00:00:00"
 start_time = 0
 timeout = 3 * 60 * 60
 number = 0
+
+writer = SummaryWriter()
 
 word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
 word_map_file = os.path.normpath(word_map_file)
@@ -77,7 +77,7 @@ def main():
     Training and validation.
     """
     global best_bleu4, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, epochs, data_name
-    global word_map, train_time, start_time, number, word_map_file, writer
+    global train_time, start_time, number, word_map_file, writer
     global decoder_lr, encoder_lr, gama_decoder, gama_encoder
 
     with open(word_map_file, 'r') as j:
@@ -102,8 +102,9 @@ def main():
         encoder = Encoder(use_pre_resnet)
         encoder.fine_tune(fine_tune_encoder)
         if fine_tune_encoder:
-            encoder_optimizer = torch.optim.Adam([{'params': encoder.parameters(), 'initial_lr': encoder_lr}],
-                                                 lr=encoder_lr) if fine_tune_encoder else 0
+            encoder_optimizer = torch.optim.Adam(
+                [{'params': [p for p in encoder.resnet.parameters() if p.requires_grad], 'initial_lr': encoder_lr}],
+                lr=encoder_lr)
         else:
             encoder_optimizer = None
     else:
@@ -124,29 +125,15 @@ def main():
         encoder_optimizer = checkpoint['encoder_optimizer']
         if fine_tune_encoder is True and encoder_optimizer is None:
             encoder.fine_tune(fine_tune_encoder)
-            encoder_optimizer = torch.optim.Adam([{'params': encoder.parameters(), 'initial_lr': encoder_lr}],
-                                                 lr=encoder_lr) if fine_tune_encoder else 0
+            encoder_optimizer = torch.optim.Adam(
+                [{'params': [p for p in encoder.resnet.parameters() if p.requires_grad], 'initial_lr': encoder_lr}],
+                lr=encoder_lr)
+
         window.set_train_time(train_time, number - 1, start_epoch, 0)
-        print(Fore.GREEN + 'Model loading from =>')
-        # 排除'encoder'键，打印剩余的信息
-        for key, value in checkpoint.items():
-            if key != 'encoder':
-                print(key + ':', value)
-        time.sleep(0.1)
 
-    dataset = CaptionDataset(data_folder, data_name, 'TRAIN', transform=transform)
-    subset_indices = list(range(number * batch_size, len(dataset)))
-    # 使用 Subset 类来创建数据集的部分子集
-    subset_dataset = Subset(dataset, subset_indices)
-    train_loader = torch.utils.data.DataLoader(
-        subset_dataset,
-        batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
-
-    total_batch = len(train_loader)
-
-    val_loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'VAL', transform=transform),
-        batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
+    # print thesis info
+    if checkpoint is not None:
+        print_model_info(checkpoint)
 
     # Move to GPU, if available
     decoder = decoder.to(device)
@@ -154,34 +141,48 @@ def main():
     # Loss function
     criterion = nn.CrossEntropyLoss().to(device)
 
+    dataset = CaptionDataset(data_folder, data_name, 'TRAIN', transform=transform)
+    val_loader = torch.utils.data.DataLoader(
+        CaptionDataset(data_folder, data_name, 'VAL', transform=transform),
+        batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=False)
     # Epochs
     start_time = time.time()
     for epoch in range(start_epoch, epochs):
-        print(Fore.BLUE + "\nDevice：", Fore.BLUE + str(device))
-        print(Fore.BLUE + f'epoch: {epoch}, batch: {number}')
+        subset_indices = list(range(number * batch_size, len(dataset)))
+        # 使用 Subset 类来创建数据集的部分子集
+        subset_dataset = Subset(dataset, subset_indices)
+        train_loader = torch.utils.data.DataLoader(
+            subset_dataset,
+            batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=False)
+        total_batch = (len(dataset) // batch_size) + 1
+        print("=" * 100)
+        print(Fore.BLUE + "Device：", Fore.BLUE + str(device))
+        print(Fore.BLUE + f'epoch: {epoch}, batch: {number}, total_batch: {total_batch}, remain: {len(train_loader)}')
         decoder_optimizer.param_groups[0]['initial_lr'] = decoder_optimizer.param_groups[0]['lr']
         print(Fore.BLUE + "initial_lr_decoder：", str(decoder_optimizer.param_groups[0]['lr']))
-        decoder_sheduler = CosineAnnealingLR(optimizer=decoder_optimizer,
-                                             T_max=total_batch, eta_min=decoder_lr * (gama_decoder ** (epoch + 1)),
-                                             last_epoch=number)
+        decoder_scheduler = CosineAnnealingLR(optimizer=decoder_optimizer,
+                                              T_max=total_batch, eta_min=decoder_lr * (gama_decoder ** (epoch + 1)),
+                                              last_epoch=number)
         if fine_tune_encoder and encoder_optimizer is not None:
+            print(Fore.BLUE + "Allow fine_tune_encoder")
             encoder_optimizer.param_groups[0]['initial_lr'] = encoder_optimizer.param_groups[0]['lr']
             print(Fore.BLUE + "initial_lr_encoder：", str(encoder_optimizer.param_groups[0]['lr']))
-            encoder_sheduler = CosineAnnealingLR(optimizer=encoder_optimizer,
-                                                 T_max=total_batch, eta_min=encoder_lr * (gama_encoder ** (epoch + 1)),
-                                                 last_epoch=number)
+            encoder_scheduler = CosineAnnealingLR(optimizer=encoder_optimizer,
+                                                  T_max=total_batch, eta_min=encoder_lr * (gama_encoder ** (epoch + 1)),
+                                                  last_epoch=number)
         else:
-            encoder_sheduler = None
+            encoder_scheduler = None
             print(Fore.BLUE + "Don`t fine_tune_encoder")
 
         # 如果连续 20 个 epoch 都没有性能提升，则提前终止训练
         if epochs_since_improvement == 10:
+            print("Reaching epochs_since_improvement")
             break
         # 假设训练开始
         # # One epoch's training
         log_path = fr'.\logs\{datasets_name}\train\epoch_{epoch}'
         temp_log_path = fr'.\logs\{datasets_name}\train\temp_epoch_{epoch}'
-        # log_write(log_path, temp_log_path, remove_dst=True)
+        log_write(src_dir=log_path, dst_dir=temp_log_path)
         time.sleep(0.05)
         writer = SummaryWriter(temp_log_path)
         train(train_loader=train_loader,
@@ -190,8 +191,8 @@ def main():
               criterion=criterion,
               encoder_optimizer=encoder_optimizer,
               decoder_optimizer=decoder_optimizer,
-              encoder_sheduler=encoder_sheduler,
-              decoder_sheduler=decoder_sheduler,
+              encoder_scheduler=encoder_scheduler,
+              decoder_scheduler=decoder_scheduler,
               epoch=epoch,
               word_map=word_map,
               total_batch=total_batch,
@@ -199,7 +200,10 @@ def main():
               log_path=log_path)
 
         # One epoch's validation
-        writer = SummaryWriter(fr'.\logs\{datasets_name}\validate\epoch_{epoch}')
+        validate_path = fr'.\logs\{datasets_name}\validate\epoch_{epoch}'
+        log_write(src_dir=validate_path, dst_dir=validate_path)
+        writer = SummaryWriter(validate_path)
+        time.sleep(0.01)
         recent_bleu4 = validate(val_loader=val_loader,
                                 encoder=encoder,
                                 decoder=decoder,
@@ -230,20 +234,27 @@ def main():
 
 
 def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_optimizer,
-          encoder_sheduler, decoder_sheduler,
+          encoder_scheduler, decoder_scheduler,
           epoch, word_map, total_batch, temp_log_path, log_path):
     """
     Performs one epoch's training.
-    :param train_loader: DataLoader for training data
-    :param encoder: encoder model
-    :param decoder: decoder model
-    :param criterion: loss layer
-    :param encoder_optimizer: optimizer to update encoder's weights (if fine-tuning)
-    :param decoder_optimizer: optimizer to update decoder's weights
-    :param epoch: epoch number
-    """
 
-    global train_time, start_time, number, window, timeout, lr_step
+    Args:
+        train_loader (DataLoader): DataLoader for training data.
+        encoder (nn.Module): Encoder thesis.
+        decoder (nn.Module): Decoder thesis.
+        criterion (nn.Module): Loss layer.
+        encoder_optimizer (torch.optim.Optimizer): Optimizer to update encoder's weights (if fine-tuning).
+        decoder_optimizer (torch.optim.Optimizer): Optimizer to update decoder's weights.
+        encoder_scheduler: Scheduler for adjusting learning rate of encoder.
+        decoder_scheduler: Scheduler for adjusting learning rate of decoder.
+        epoch (int): Epoch number.
+        word_map (dict): Word map.
+        total_batch (int): Total number of batches.
+        temp_log_path (str): Path to temporary log file.
+        log_path (str): Path to log file.
+    """
+    global train_time, start_time, number, window, timeout
     window.enable_button()  # 设置按钮为可点击状态
 
     # 设置解码、编码器为训练模式（启用 dropout 和批归一化）
@@ -279,7 +290,7 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
             targets = caps_sorted[:, 1:]  # torch.Size([batch, max_caption_len])
 
             targets = caps_to_hot(len(scores), targets, max(decode_lengths), word_map)
-            targets.to(device)
+            # targets = targets.to(device)
 
             loss = criterion(scores, targets)
             # Add doubly stochastic attention regularization
@@ -308,13 +319,13 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
             else:
                 lr_encoder = 0
 
+            decoder_scheduler.step()
+            if encoder_optimizer is not None:
+                encoder_scheduler.step()
+
             top5 = accuracy(scores, targets, 5)
             losses.update(loss.item(), sum(decode_lengths))
             top5accs.update(top5, sum(decode_lengths))
-
-            decoder_sheduler.step()
-            if encoder_optimizer is not None:
-                encoder_sheduler.step()
 
             writer.add_scalars('Train/learning_rate',
                                {'decoder_optimizer': lr_decoder, 'encoder_optimizer': lr_encoder}, number + i)
@@ -370,13 +381,14 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         window.ban_button()
 
 
-def validate(val_loader, encoder, decoder, criterion, word_map):
+def validate(val_loader, encoder, decoder, criterion, word_map, write_log=True):
     """
     Performs one epoch's validation.
     :param val_loader: DataLoader for validation data.
-    :param encoder: encoder model
-    :param decoder: decoder model
+    :param encoder: encoder thesis
+    :param decoder: decoder thesis
     :param criterion: loss layer
+    :param word_map: Word map.
     :return: BLEU-4 score
     """
     global writer
@@ -387,8 +399,17 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
 
     losses = AverageMeter()
     top5accs = AverageMeter()
+
     bleu = AverageMeter()
+    bleu1 = AverageMeter()
+    bleu2 = AverageMeter()
+    bleu3 = AverageMeter()
+    bleu4 = AverageMeter()
     rouge = AverageMeter()
+    rouge1 = AverageMeter()
+    rouge2 = AverageMeter()
+    rouge3 = AverageMeter()
+    rouge4 = AverageMeter()
 
     references = list()  # references (true captions) for calculating BLEU-4 score
     hypotheses = list()  # hypotheses (predictions)
@@ -413,7 +434,7 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
                 targets = caps_sorted[:, 1:]
 
                 targets = caps_to_hot(len(scores), targets, max(decode_lengths), word_map)
-                # targets.to(device)
+                targets = targets.to(device)
 
                 scores_copy = scores.clone()
 
@@ -443,14 +464,51 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
                 preds = preds.tolist()
                 temp_preds = list()
                 for j, p in enumerate(preds):
-                    temp_preds.append(preds[j][:decode_lengths[j]])  # remove pads
+                    temp_preds.append(preds[j][:decode_lengths[j]])
                 preds = temp_preds
                 hypotheses.extend(preds)
 
                 assert len(references) == len(hypotheses)
                 # Calculate BLEU-4 scores
-                bleu.update(get_bleu(references, hypotheses))
-                rouge.update(get_rouge(references, hypotheses))
+                ([b1, b2, b3, b4], b_avg) = get_bleu(references, hypotheses, all_bleu=True)
+                r_scores_corpus, r_avg = get_rouge(references, hypotheses, all_rouge=True)
+                r1 = r_scores_corpus[0]
+                r2 = r_scores_corpus[1]
+                r3 = r_scores_corpus[2]
+                r4 = r_scores_corpus[3]
+                references = []
+                hypotheses = []
+                bleu.update(b_avg)
+                bleu1.update(b1)
+                bleu2.update(b2)
+                bleu3.update(b3)
+                bleu4.update(b4)
+                rouge.update(r_avg)
+                rouge1.update(r1['f'])
+                rouge2.update(r2['f'])
+                rouge3.update(r3['f'])
+                rouge4.update(r4['f'])
+                # Write validation metrics to TensorBoard
+                if write_log:
+                    writer.add_scalars('Test/bleu', {'bleu1': b1, 'bleu1_avg': bleu1.avg}, i)
+                    writer.add_scalars('Test/bleu', {'bleu2': b2, 'bleu2_avg': bleu2.avg}, i)
+                    writer.add_scalars('Test/bleu', {'bleu3': b3, 'bleu3_avg': bleu3.avg}, i)
+                    writer.add_scalars('Test/bleu', {'bleu4': b4, 'bleu4_avg': bleu4.avg}, i)
+                    writer.add_scalars('Test/bleu', {'bleu_avg(1-4)': bleu.avg}, i)
+
+                    writer.add_scalars('Test/rouge',
+                                       {'r1_F1': r1['f'], 'r1_precision': r1['p'],
+                                        'r1_recall': r1['r'], 'r1_F1_avg': rouge1.avg}, i)
+                    writer.add_scalars('Test/rouge',
+                                       {'r2_F1': r2['f'], 'r2_precision': r2['p'],
+                                        'r2_recall': r2['r'], 'r2_F1_avg': rouge2.avg}, i)
+                    writer.add_scalars('Test/rouge',
+                                       {'r3_F1': r3['f'], 'r3_precision': r3['p'],
+                                        'r3_recall': r3['r'], 'r3_F1_avg': rouge3.avg}, i)
+                    writer.add_scalars('Test/rouge',
+                                       {'r4_F1': r4['f'], 'r4_precision': r4['p'],
+                                        'r4_recall': r4['r'], 'r4_F1_avg': rouge4.avg}, i)
+                    writer.add_scalars('Test/rouge', {'rouge_avg(1-4)': rouge.avg}, i)
 
                 # Write validation metrics to TensorBoard
                 writer.add_scalars('Train/Loss', {'val': losses.val, 'avg': losses.avg}, i)
@@ -461,9 +519,9 @@ def validate(val_loader, encoder, decoder, criterion, word_map):
                 t.set_postfix(loss=f"{losses.val:.4f}({losses.avg:.4f})",
                               top5=f"{top5accs.val:.3f} ({top5accs.avg:.3f})")
                 t.update(1)
-
         print(
-            '\n * LOSS: {loss.avg:.3f}, TOP-5: {top5.avg:.3f}, BLEU_4: {bleu.avg}, Rouge: {rouge.avg}\n'.format(
+            '\n * LOSS: {loss.avg:.3f}, TOP-5: {top5.avg:.3f}\n'
+            'BLEU: {bleu.avg}, Rouge: {rouge.avg}'.format(
                 loss=losses,
                 top5=top5accs,
                 bleu=bleu,
@@ -507,5 +565,5 @@ if __name__ == '__main__':
 
     main()
     # 等待窗口线程执行完成后再退出
-    window_thread.join()
+    # window_thread.join()
     sys.exit()

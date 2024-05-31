@@ -57,7 +57,7 @@ class CaptionDataset(Dataset):
 
         if self.split == 'TRAIN':
             return img, caption, caplen
-        elif self.split == 'TESTdatasets.py':
+        elif self.split == 'TEST':
             pri_image = self.imgs[i // self.cpi]
             all_captions = torch.LongTensor(
                 self.captions[((i // self.cpi) * self.cpi):(((i // self.cpi) * self.cpi) + self.cpi)])

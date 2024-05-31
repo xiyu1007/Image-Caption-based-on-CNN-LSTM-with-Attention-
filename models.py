@@ -54,7 +54,8 @@ class Encoder(nn.Module):
 
         # 如果允许微调，仅允许微调卷积块4到:
         if fine_tune:
-            for c in list(self.resnet.children())[4:]:
+
+            for c in list(self.resnet.children())[7:]:  # Max = 0-7
                 for p in c.parameters():
                     p.requires_grad = fine_tune
 
@@ -252,7 +253,7 @@ class DecoderWithAttention(nn.Module):
             h, c = self.decode_step(
                 torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
                 (h[:batch_size_t], c[:batch_size_t]))  # (batch_size_t, decoder_dim)
-            """
+            """-
             将当前时间步的嵌入（embeddings）和注意力加权的编码（attention_weighted_encoding）进行拼接。
             通常，解码器在每个时间步会使用当前时间步的嵌入以及注意力机制得到的编码信息来生成下一个单词。
             """
@@ -272,11 +273,13 @@ if __name__ == '__main__':
     # 创建模型实例
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     encoder = Encoder()
-    # print(encoder)
+    print(encoder)
     # 打印ResNet每一层的名称
 
     # 将模型移动到可用的设备上
     encoder.to(device)
+    # print(encoder)
+    # 获取模型参数
     # 打印模型摘要
     # summary(encoder, input_size=(3, 224, 224))
     # AdaptiveAvgPool2d - 343[-1, 2048, 14, 14]

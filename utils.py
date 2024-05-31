@@ -1,3 +1,5 @@
+import pandas as pd
+
 import csv
 import shutil
 
@@ -15,6 +17,7 @@ import torch
 from ipywidgets import interact, fixed
 
 from matplotlib import pyplot as plt, image as mpimg
+from prettytable import PrettyTable
 from tqdm import tqdm
 
 from colorama import init, Fore
@@ -23,15 +26,14 @@ init()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def log_write(src_dir, dst_dir, remove_dst=False):
+def log_write(src_dir, dst_dir):
+    """
+    write src_dir to dst_dir
+    """
     if not os.path.exists(src_dir):
-        if remove_dst:
-            if os.path.exists(dst_dir):
-                shutil.rmtree(dst_dir)
-                os.makedirs(dst_dir, exist_ok=True)
-                print(Fore.YELLOW + "\nlog_write--remove path:  ", dst_dir)
         print(Fore.YELLOW + "\nlog_write--path is not exists: ", src_dir)
-        return
+        os.makedirs(src_dir, exist_ok=True)
+        print(Fore.YELLOW + "log_write--creat NULL dir:  ", src_dir)
     if os.path.exists(dst_dir):
         shutil.rmtree(dst_dir)
     os.makedirs(dst_dir, exist_ok=True)
@@ -126,7 +128,7 @@ def init_embedding(embeddings):
 
 def load_embeddings(emb_file, word_map):
     """
-    Creates an embedding tensor for the specified word map, for loading into the model.
+    Creates an embedding tensor for the specified word map, for loading into the thesis.
 
     :param emb_file: file containing embeddings (stored in GloVe format)
     :param word_map: word map
@@ -184,7 +186,7 @@ class AverageMeter(object):
 def accuracy(scores, targets, k):
     """
     Computes top-k accuracy, from predicted and true labels.
-    :param scores: scores from the model
+    :param scores: scores from the thesis
     :param targets: true labels
     :param k: k in top-k accuracy
     :return: top-k accuracy
@@ -437,13 +439,13 @@ def create_csv(txt_path, csv_path=None):
 def save_checkpoint(data_name, epoch, epochs_since_improvement, encoder, decoder, encoder_optimizer, decoder_optimizer,
                     bleu4, is_best, model_save_path, train_time, losses, top5accs, number=0):
     """
-    Saves model checkpoint.
+    Saves thesis checkpoint.
 
     :param data_name: base name of processed dataset
     :param epoch: epoch number
     :param epochs_since_improvement: number of epochs since last improvement in BLEU-4 score
-    :param encoder: encoder model
-    :param decoder: decoder model
+    :param encoder: encoder thesis
+    :param decoder: decoder thesis
     :param encoder_optimizer: optimizer to update encoder's weights, if fine-tuning
     :param decoder_optimizer: optimizer to update decoder's weights
     :param bleu4: validation BLEU-4 score for this epoch
@@ -481,13 +483,13 @@ def save_temp_checkpoint(data_name, epoch, epochs_since_improvement, encoder, de
                          decoder_optimizer,
                          bleu4, model_save_path, train_time, losses, top5accs, number):
     """
-    Saves model checkpoint.
+    Saves thesis checkpoint.
 
     :param data_name: base name of processed dataset
     :param epoch: epoch number
     :param epochs_since_improvement: number of epochs since last improvement in BLEU-4 score
-    :param encoder: encoder model
-    :param decoder: decoder model
+    :param encoder: encoder thesis
+    :param decoder: decoder thesis
     :param encoder_optimizer: optimizer to update encoder's weights, if fine-tuning
     :param decoder_optimizer: optimizer to update decoder's weights
     :param bleu4: validation BLEU-4 score for this epoch
@@ -531,7 +533,7 @@ def adjust_learning_rate(optimizer, shrink_factor):
     print(Fore.BLUE + "The new learning rate is %.6f\n" % (optimizer.param_groups[0]['lr'],))
 
 
-def img_show(img, candidate=None, reference=None, is_path=False, save_path=None, id=0, show=False, bottom=0.35):
+def img_show(img, candidate=None, reference=None,is_path=False,show=False, save_path=None, id=0, bottom=0.35):
     # matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
     fig, ax = plt.subplots()
     if candidate is not None:
@@ -558,7 +560,7 @@ def img_show(img, candidate=None, reference=None, is_path=False, save_path=None,
         plt.close()
 
 
-def print_gpu_utilization():
+def print_gpu_utilization(folder_path,image_folders):
     # 检查GPU是否可用
     if torch.cuda.is_available():
         # 获取GPU数量
@@ -583,7 +585,103 @@ def print_gpu_utilization():
         print("GPU {} Utilization: {}%".format(i, utilization.gpu))
 
     pynvml.nvmlShutdown()
+# 遍历 CSV 文件路径列表
+def csv_inte(folder_path,image_folders,new_csv_path='./datasets/thesis.csv'):
+    # 将筛选后的结果重新组织为新的 DataFrame，每个图片包含五个句子
+    with open(new_csv_path, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file, delimiter='|')
+        csv_writer.writerow(['image_name', 'comment_number', 'comment'])
+        for idx, csv_path in enumerate(folder_path):
+            # 读取当前 CSV 文件
+            df = pd.read_csv(csv_path, delimiter='|')
+            image_folder = image_folders[idx]
+            # 在处理之前拼接 image_folder 到 image_name
+            df['image_name'] = image_folder + '/' + df['image_name']
 
+            # 筛选包含 'dog' 或 'cat' 的行
+            df_filtered = df[df['comment'].str.contains('dogs|cats|dog|cat|Dog|Cat|Dogs|Cats')]
+
+            grouped = df_filtered.groupby('image_name')
+            for image_name, group_df in grouped:
+                if len(group_df) < 5:
+                    continue
+                comment_id = 1
+                for _, row in group_df.iterrows():
+                    if comment_id > 5:
+                        break
+                    comment_number = row['comment_number']
+                    comment = row['comment']
+                    # 写入每个句子的组合行
+                    csv_writer.writerow([image_name, comment_number, comment])
+                comment_id += 1
+    print("处理多个 CSV 文件并合并成一个新的 CSV 文件完成！")
+
+def print_model_info(checkpoint, training_param=True, optimizer_param=True, fixed_param=True):
+    if isinstance(checkpoint, str):
+        checkpoint = torch.load(checkpoint)
+
+    print(Fore.BLUE + "Model Checkpoint Information:")
+    if fixed_param:
+        decoder = checkpoint['decoder']
+        encoder_dim = decoder.encoder_dim
+        attention_dim = decoder.attention_dim
+        embed_dim = decoder.embed_dim
+        decoder_dim = decoder.decoder_dim
+        vocab_size = decoder.vocab_size
+        dropout = decoder.dropout.p
+
+        # 创建一个表格对象
+        fixed_table = PrettyTable(["Parameter", "Value"])
+        # 添加信息到表格中
+        fixed_table.add_row(["Dropout", dropout])
+        fixed_table.add_row(["Encoder Dimension", encoder_dim])
+        fixed_table.add_row(["Decoder Dimension", decoder_dim])
+        fixed_table.add_row(["Attention Dimension", attention_dim])
+        fixed_table.add_row(["Embedding Dimension", embed_dim])
+        fixed_table.add_row(["Vocab size", vocab_size])
+        # 设置表格的样式
+        fixed_table.align = "l"
+        fixed_table.header_style = "title"
+        fixed_table.border = True
+        # 打印表格
+        print(fixed_table)
+    if training_param:
+        # epoch = checkpoint['epoch']
+        # number = checkpoint['number']
+        # train_time = checkpoint['train_time']
+        # bleu_rouge = checkpoint['bleu-4']
+        basic_table = PrettyTable(["Epoch", "Number", "Training Time", "(BLEU+ROUGE)/2"])
+        # 将信息添加到表格中
+        basic_table.add_row(
+            [checkpoint['epoch'], checkpoint['number'], checkpoint['train_time'], checkpoint['bleu-4']])
+        # 打印表格
+        print(basic_table)
+    if optimizer_param:
+        decoder_optimizer = checkpoint['decoder_optimizer']
+        encoder_optimizer = checkpoint['encoder_optimizer']
+
+        initial_lr_decoder = decoder_optimizer.param_groups[0]['initial_lr']
+        lr_decoder = decoder_optimizer.param_groups[0]['lr']
+
+        if encoder_optimizer is not None:
+            initial_lr_encoder = encoder_optimizer.param_groups[0]['initial_lr']
+            lr_encoder = encoder_optimizer.param_groups[0]['lr']
+        else:
+            initial_lr_encoder = None
+            lr_encoder = None
+
+        # 创建一个表格对象
+        lr_table = PrettyTable(["Optimizer", "Initial Learning Rate", "Learning Rate"])
+        # 添加信息到表格中
+        lr_table.add_row(["Decoder", initial_lr_decoder, lr_decoder])
+        lr_table.add_row(["Encoder", initial_lr_encoder, lr_encoder])
+        # 设置表格的样式
+        lr_table.align = "l"
+        lr_table.header_style = "title"
+        lr_table.border = True
+
+        # 打印表格
+        print(lr_table)
 
 if __name__ == '__main__':
     path = f'datasets/flickr8k/captions.txt'

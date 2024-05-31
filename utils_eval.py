@@ -27,22 +27,26 @@ def calc_rouge(hypothesis, references, n=1):
     return rouge_score
 
 
-def get_rouge(references, hypotheses):
+def get_rouge(references, hypotheses,all_rouge=False):
     assert len(references) == len(hypotheses), "Number of references and hypotheses should be same."
     rouge_N = 0.
+    rouge_scores_corpus = []
     for n in range(1, 5):
         rouge_n = 0.
         for ref, hyp in zip(references, hypotheses):
             rouge = calc_rouge(hyp, ref, n)
+            rouge_scores_corpus.append(rouge)
             rouge_n += rouge['f']
         rouge_n = rouge_n / len(hypotheses)  # 计算每个批次平均 n-F1
         # print(f"ROUGE-{n}:", rouge_n)
         rouge_N += rouge_n
     rouge_N = rouge_N / 4.0
+    if all_rouge:
+        return rouge_scores_corpus,rouge_N
     return rouge_N
 
 
-def get_bleu(references, hypotheses):
+def get_bleu(references, hypotheses,all_bleu=False):
     assert len(references) == len(hypotheses), "Number of references and hypotheses should be same."
     hypotheses = [[str(word) for word in sent] for sent in hypotheses]
     references = [[[str(word) for word in sent] for sent in ref] for ref in references]
@@ -60,6 +64,9 @@ def get_bleu(references, hypotheses):
         # print(f"Corpus BLEU-{n} Score: {score * 100:.2f}%")  # 将分数转为保留两位小数的形式
         average_bleu_score += score
     average_bleu_score /= 4.0
+    if all_bleu:
+        return bleu_scores_corpus,average_bleu_score
+
     # print(f"Corpus BLEU- Score: {average_bleu_score * 100:.2f}%")  # 将分数转为保留两位小数的形式
     return average_bleu_score
 

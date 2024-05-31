@@ -31,16 +31,18 @@ def coco_to_csv(annFile, csv_path):
             for idx, ann in enumerate(anns):
                 writer.writerow([img['file_name'], idx, ann['caption']])
 
+    print(f"Successful write to {csv_path}")
+
 
 if __name__ == '__main__':
     # TODO
-    dataDir = 'datasets/COCO2014/annotations_trainval2014'
+    dataDir = 'datasets/coco/annotations_trainval2014'
     dataType = 'val2014'
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
-    csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
+    csv_path = 'datasets/coco/coco_{}.csv'.format(dataType)
     coco_to_csv(annFile, csv_path)
 
     dataType = 'train2014'
     annFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
-    csv_path = 'datasets/COCO2014/coco_{}.csv'.format(dataType)
+    csv_path = 'datasets/coco/coco_{}.csv'.format(dataType)
     coco_to_csv(annFile, csv_path)

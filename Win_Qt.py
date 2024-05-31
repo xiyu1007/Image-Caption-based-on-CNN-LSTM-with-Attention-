@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
         global pre_image
         super().__init__()
         self.setWindowTitle("Image Caption")
-        self.setMinimumSize(800, 650)  # 设置窗口的最小大小为 700x700
+        self.setMinimumSize(800, 700)  # 设置窗口的最小大小为 700x700
         self.pixmap = None
         self.model_path = model_path
         self.save_flag = False
@@ -47,6 +47,8 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(train_parameter_layout)
         model_layout = QHBoxLayout()
         main_layout.addLayout(model_layout)
+        word_map_layout = QHBoxLayout()
+        main_layout.addLayout(word_map_layout)
 
         self.input_path = QLineEdit()
         self.input_path.setPlaceholderText("Enter image path...")
@@ -89,6 +91,7 @@ class MainWindow(QMainWindow):
         train_parameter_layout.addStretch()
         self.label_lr_running = QLabel("Current learning rate")
         self.label_lr_running.setFixedWidth(200)
+        self.label_lr_running.setEnabled(False)
         train_parameter_layout.addWidget(self.label_lr_running)
         self.text_lr_running = QLineEdit("0.00000")
         self.text_lr_running.setFixedWidth(100)
@@ -110,6 +113,11 @@ class MainWindow(QMainWindow):
         self.model_path_text = QLineEdit()
         self.model_path_text.setPlaceholderText("Enter model path...")
         model_layout.addWidget(self.model_path_text)
+
+        self.word_map_path_text = QLineEdit()
+        self.word_map_path_text.setPlaceholderText("Enter word_map path...")
+        word_map_layout.addWidget(self.word_map_path_text)
+        self.word_map_path_text.textChanged.connect(self.text_changed_slot_word_map)
 
         # 创建只读文本框
         self.model_train_time = QLineEdit()
@@ -140,12 +148,16 @@ class MainWindow(QMainWindow):
             model_path_text = self.model_path_text.text()
 
             def show_thread(model_path):
-                qimage = qt_show(model_path, image_path, self.word_map_path)
-                # 创建 QPixmap 并将 QImage 转换为 QPixmap
-                self.pixmap = QPixmap.fromImage(qimage)
-                self.result_label.setPixmap(self.pixmap)
-                self.result_label.setScaledContents(True)  # 将图片缩放以填充 QLabel
-                self.enable_button()
+                try:
+                    qimage = qt_show(model_path, image_path, self.word_map_path)
+                    # 创建 QPixmap 并将 QImage 转换为 QPixmap
+                    self.pixmap = QPixmap.fromImage(qimage)
+                    self.result_label.setPixmap(self.pixmap)
+                    self.result_label.setScaledContents(True)  # 将图片缩放以填充 QLabel
+                    self.enable_button()
+                except Exception as e:
+                    self.enable_button()
+                    print("show_thread: ", e)
 
             if model_path_text == "":
                 show_t = threading.Thread(target=show_thread, args=(self.model_path,))
@@ -236,6 +248,10 @@ class MainWindow(QMainWindow):
             print(Fore.YELLOW + "\nsave_recall--button_reset：", e)
             self.enable_button()
 
+    def text_changed_slot_word_map(self,word_map):
+        if os.path.exists(word_map):
+            self.word_map_path = os.path.normpath(word_map)
+
     def text_changed_slot(self, checkpoint):
         def text_thread(checkpoint):
             try:
@@ -246,7 +262,7 @@ class MainWindow(QMainWindow):
                 self.model_train_time.setText(f"{epoch}-{str(number)}-{train_time}")
                 # self.model_train_time.setFixedWidth(self.model_train_time.sizeHint().width() + 100)
             except Exception as e:
-                print(Fore.YELLOW + "\nError loading model:", e)
+                print(Fore.YELLOW + "\nError loading thesis:", e)
             self.model_path_text.textChanged.connect(self.text_changed_slot)
 
         if os.path.exists(checkpoint):
@@ -264,18 +280,18 @@ class MainWindow(QMainWindow):
             return False
 
 
-pre_image = 'datasets/img/img.png'
+pre_image = 'datasets/img/img_3.png'
 
 if __name__ == '__main__':
     # TODO 请确保由creat_input_files.py生成的word_map_file 路径与需要查看的模型匹配
-    # matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
+    matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
 
-    datasets_name = 'coco_no_premodel'
+    datasets_name = 'flickr_use_premodel'
     data_folder = f'out_data/{datasets_name}/out_hdf5/per_5_freq_1_maxlen_50'  # folder with data files saved by create_input_files.py
     data_name = f'{datasets_name}_5_cap_per_img_1_min_word_freq'  # base name shared by data files
     temp_path = f'out_data/{datasets_name}/save_model'
 
-    checkpoint = r"out_data/coco/save_model/temp_checkpoint_coco_5_cap_per_img_5_min_word_freq_3318.pth"
+    checkpoint = "out_data/flickr_use_premodel/save_model/BEST_checkpoint_flickr_use_premodel_5_cap_per_img_1_min_word_freq_epoch_1.pth"
     checkpoint, _, _ = path_checker(checkpoint, True, False)
 
     word_map_file = os.path.join(data_folder, 'WORDMAP_' + data_name + '.json')
@@ -298,10 +314,7 @@ if __name__ == '__main__':
     app.setFont(font, "QDoubleSpinBox")
     app.setFont(font, "QLabel")
 
-    filename = 'checkpoint_' + data_name + '_epoch_2' + '.pth'
-    model_path = os.path.join(temp_path, filename)
-    model_path, _, _ = path_checker(model_path, True, False)
-    window = MainWindow(model_path, word_map_file)
+    window = MainWindow(checkpoint, word_map_file)
     window.main_flag = False
     window.ban_button()
     window.enable_button()

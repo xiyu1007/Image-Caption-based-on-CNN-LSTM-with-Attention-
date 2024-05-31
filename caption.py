@@ -38,6 +38,7 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
     img = cv2.imread(image_path)
     # 如果需要，将 BGR 转换为 RGB
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
     # 检查图像是否为灰度图（2D），如果是，转换为 RGB（3D）
     if len(img.shape) == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
@@ -46,9 +47,9 @@ def caption_image_beam_search(encoder, decoder, image_path, word_map, beam_size=
     # 转置维度以使通道维度成为第一个维度
     # （高度，宽度，通道）==>（通道，高度，宽度）
     img = np.transpose(img, (2, 0, 1))
-
     # img = img / 255.
     img = torch.FloatTensor(img / 255.)
+
     img = torch.FloatTensor(img).to(device)
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -253,6 +254,7 @@ def visualize_att(image_path, seq, alphas, rev_word_map, smooth=True):
     buf.seek(0)
 
     plt.show()
+    plt.savefig('my_plot.png')
     # plt.close()
 
     # Convert buffer to QImage
@@ -275,11 +277,14 @@ def qt_show(model_path, img_path, word_map_path):
         encoder = checkpoint['encoder']
         encoder = encoder.to(device)
         encoder.eval()
-
-        # 加载单词映射（word2ix）
-        with open(word_map_path, 'r') as j:
-            word_map = json.load(j)
-        rev_word_map = {v: k for k, v in word_map.items()}  # ix2word
+        try:
+            # 加载单词映射（word2ix）
+            with open(word_map_path, 'r') as j:
+                word_map = json.load(j)
+            rev_word_map = {v: k for k, v in word_map.items()}  # ix2word
+        except Exception as e:
+            print(Fore.YELLOW + "\nError loading word map:", e)
+            return
 
         # 使用注意力和 beam search 进行编码和解码
         seq, alphas = caption_image_beam_search(encoder, decoder, img_path, word_map, beam_size)
@@ -303,9 +308,9 @@ if __name__ == '__main__':
     matplotlib.use('TkAgg')  # 多线程错误问题,请使用Agg
 
     # 设置参数
-    model_path = 'out_data/flickr8k/save_model/checkpoint_flickr8k_5_cap_per_img_5_min_word_freq_epoch_7.pth'  # 模型路径
+    model_path = 'out_data/temp/flickr_use_premodel/save_model/model/BEST_checkpoint_flickr_use_premodel_5_cap_per_img_1_min_word_freq_epoch_4.pth'  # 模型路径
     img_path = f'datasets/img/img.png'  # 图像路径
-    word_map_path = 'out_data/flickr8k/out_hdf5/per_5_freq_5_maxlen_52/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # 单词映射 JSON 路径
+    word_map_path = "out_data/temp/flickr_use_premodel/out_hdf5/per_5_freq_1_maxlen_50/WORDMAP_flickr_use_premodel_5_cap_per_img_1_min_word_freq.json"
     model_path, _, _ = path_checker(model_path, True, False)
     img_path, _, _ = path_checker(img_path, True, False)
     word_map_path, _, _ = path_checker(word_map_path, True, False)
@@ -315,7 +320,7 @@ if __name__ == '__main__':
 
     # 加载模型
     checkpoint = torch.load(model_path, map_location=str(device))
-    print(Fore.GREEN + 'Model loading from => \n' + str(checkpoint))
+    print_model_info(checkpoint)
 
     decoder = checkpoint['decoder']
     decoder = decoder.to(device)
